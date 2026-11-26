@@ -59,12 +59,11 @@
     var a = src.getContext('2d').getImageData(0, 0, w, h).data, d = x.createImageData(w, h), q = d.data, cr = hexRgb(color);
     for (var y = 0; y < h; y++) for (var xx = 0; xx < w; xx++) {
       var i = (y * w + xx) * 4; if (a[i + 3] < 128) continue;
-      var edge = false;
-      for (var dy = -2; dy <= 2 && !edge; dy++) for (var dx = -2; dx <= 2; dx++) {
-        var ny = y + dy, nx = xx + dx;
-        if (ny < 0 || nx < 0 || ny >= h || nx >= w || a[(ny * w + nx) * 4 + 3] < 128) { edge = true; break; }
+      if (y < 2 || xx < 2 || y >= h - 2 || xx >= w - 2 ||
+          a[((y - 2) * w + xx) * 4 + 3] < 128 || a[((y + 2) * w + xx) * 4 + 3] < 128 ||
+          a[(y * w + xx - 2) * 4 + 3] < 128 || a[(y * w + xx + 2) * 4 + 3] < 128) {
+        q[i] = cr[0]; q[i + 1] = cr[1]; q[i + 2] = cr[2]; q[i + 3] = 230;
       }
-      if (edge) { q[i] = cr[0]; q[i + 1] = cr[1]; q[i + 2] = cr[2]; q[i + 3] = 230; }
     }
     x.putImageData(d, 0, 0); return (src[k] = c);
   };

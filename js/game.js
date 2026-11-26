@@ -47,15 +47,16 @@
   }
   var P = Game.prototype;
 
-  // Smooth circle-vs-circle pushout against solid world props (stumps, boulders, ruins, pillars)
+  // Smooth circle-vs-circle pushout against solid world props (O(1) cached cell lookup)
   P.resolveObstacles = function (ent, r) {
     if (!LF.worldProp) return;
-    var ps = LF.PROP_CELL, cx = Math.floor(ent.x / ps), cy = Math.floor(ent.y / ps);
-    for (var ax = cx - 1; ax <= cx + 1; ax++) {
-      for (var ay = cy - 1; ay <= cy + 1; ay++) {
+    var ps = LF.PROP_CELL, pad = r + 26;
+    var x0 = Math.floor((ent.x - pad) / ps), x1 = Math.floor((ent.x + pad) / ps);
+    var y0 = Math.floor((ent.y - pad) / ps), y1 = Math.floor((ent.y + pad) / ps);
+    for (var ax = x0; ax <= x1; ax++) {
+      for (var ay = y0; ay <= y1; ay++) {
         var pr = LF.worldProp(this.artZ, ax, ay);
         if (!pr || !pr.solid) continue;
-        // Obstacle base circle sits slightly above footY
         var ox = pr.x, oy = pr.y - pr.solid * 0.45, rr = r + pr.solid;
         var dx = ent.x - ox, dy = ent.y - oy, d2 = dx * dx + dy * dy;
         if (d2 < rr * rr) {

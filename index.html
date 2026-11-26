@@ -15,8 +15,9 @@
 <meta property="og:url" content="https://aivmake.ru/lanternfall/">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><circle cx='32' cy='32' r='30' fill='%2307060c'/><rect x='24' y='20' width='16' height='24' rx='3' fill='%23ffe27a'/><rect x='22' y='16' width='20' height='5' fill='%238a7a5a'/><rect x='22' y='43' width='20' height='5' fill='%238a7a5a'/></svg>">
-<link rel="preload" href="assets/fonts/pixelify-cyr.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=8">
+<link rel="preload" href="assets/fonts/philosopher-cyr.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/fonts/rubik-cyr.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="style.css?v=9">
 </head>
 <body>
 <canvas id="game"></canvas>
@@ -111,20 +112,27 @@
 
 <!-- How to play -->
 <div id="scr-how" class="screen hidden">
-  <div class="panel">
+  <div class="panel wide">
     <div class="panel-head"><button class="back" data-go="title">←</button><h2>Как играть</h2><div></div></div>
-    <div class="how">
-      <p><b>Ты последний фонарь.</b> Тьма съела мир, и только твой свет еще держит ее на расстоянии.</p>
-      <p><b>Двигайся</b> WASD или стрелками. На телефоне веди пальцем в любом месте экрана. Геймпад тоже работает.</p>
-      <p><b>Атакуешь автоматически.</b> Твоя задача выбирать позицию, собирать осколки света и не попадать в окружение.</p>
-      <p><b>Осколки дают уровни.</b> На каждом уровне выбираешь одно из улучшений: новое оружие или усиление.</p>
-      <p><b>Эволюция.</b> Прокачай оружие до 5 уровня и возьми парное усиление, тогда оружие переродится в легендарное.</p>
-      <p><b>Вспышка фонаря.</b> Свет копится сам и от осколков. Когда полоса ✦ заполнена наполовину, жми Пробел, Shift, кнопку ✦ на экране или A на геймпаде: волна света оглушит врагов и сотрет их снаряды. Но чем меньше света, тем ближе подступает тьма.</p>
-      <p><b>Алтари ✧</b> появляются раз в 75 секунд. Дойди до алтаря и получи благословение: ярость, скорость, эгиду или полный фонарь.</p>
-      <p><b>Через 5 минут приходит босс.</b> Победи его, и откроется следующая земля.</p>
-      <p><b>Угольки</b> копятся за каждый забег. Трать их на Алтаре, чтобы стать сильнее навсегда.</p>
-      <p class="muted">Пауза: Esc или P. Цифры 1-4 выбирают улучшение, R перебрасывает. M выключает звук, F открывает игру на весь экран, Enter в меню запускает следующий забег.</p>
+    <div class="how-grid">
+      <div class="how-card">
+        <h3>Управление и бой</h3>
+        <p>Двигайся <b>WASD</b> или стрелками (на телефоне веди пальцем в любом месте, геймпад тоже поддерживается). Оружие атакует автоматически: твоя задача держать дистанцию, обходить препятствия и собирать осколки света.</p>
+      </div>
+      <div class="how-card">
+        <h3>Свет как ресурс</h3>
+        <p>Фонарь копит свет сам и от осколков. При 50% заряда жми <b>Пробел</b>, <b>Shift</b> или кнопку вспышки: волна света оглушит врагов и сотрет их снаряды, но радиус обзора временно сузится.</p>
+      </div>
+      <div class="how-card">
+        <h3>Эволюции оружия</h3>
+        <p>На каждом уровне выбирай 1 из 3 карточек (клавиши <b>1-4</b>, переброс <b>R</b>). Прокачай оружие до 5 уровня и возьми парное усиление, чтобы переродить его в легендарную форму. Пара указана прямо на карточке.</p>
+      </div>
+      <div class="how-card">
+        <h3>Алтари, боссы и угольки</h3>
+        <p>Раз в 75 секунд зажигается алтарь света с благословением (стрелка у края экрана покажет путь). Через 5 минут приходит босс земли. Угольки остаются после каждого забега и тратятся на Алтаре улучшений навсегда.</p>
+      </div>
     </div>
+    <p class="muted center how-keys">Горячие клавиши: Esc / P пауза · 1-4 выбор карточки · R переброс · M звук · F полный экран</p>
   </div>
 </div>
 
@@ -195,12 +203,12 @@
 <div id="rotate-tip" class="hidden"></div>
 <div id="errbox" class="errbox hidden"><b>Что-то пошло не так</b><span id="errmsg"></span><div><button id="errreload" class="btn small primary">Перезагрузить</button><button id="errclose" class="btn small">Закрыть</button></div><small>Прогресс сохранен</small></div>
 <noscript>Для игры нужен включенный JavaScript</noscript>
-<script src="js/data.js?v=8"></script>
-<script src="js/game.js?v=8"></script>
-<script src="js/art.js?v=8"></script>
-<script src="js/sprites.js?v=8"></script>
-<script src="js/render.js?v=8"></script>
-<script src="js/audio.js?v=8"></script>
-<script src="js/main.js?v=8"></script>
+<script src="js/data.js?v=9"></script>
+<script src="js/game.js?v=9"></script>
+<script src="js/art.js?v=9"></script>
+<script src="js/sprites.js?v=9"></script>
+<script src="js/render.js?v=9"></script>
+<script src="js/audio.js?v=9"></script>
+<script src="js/main.js?v=9"></script>
 </body>
 </html>

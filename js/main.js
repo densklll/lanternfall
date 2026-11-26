@@ -53,11 +53,11 @@
   var view = { cw: 0, ch: 0, dpr: 1, scale: 1, lightmap: document.createElement('canvas') };
   function resize() {
     var w = window.innerWidth, h = window.innerHeight;
-    var dpr = Math.min(window.devicePixelRatio || 1, isTouch ? 1.75 : 2, view.dprCap || 9);
+    var dpr = Math.min(window.devicePixelRatio || 1, isTouch ? 1.35 : 1.5, view.dprCap || 9);
     view.cw = w; view.ch = h; view.dpr = dpr;
     view.scale = Math.max(0.7, Math.min(1.35, Math.sqrt(w * h) / 960));
     canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
-    view.lightmap.width = Math.max(1, Math.round(w / 2)); view.lightmap.height = Math.max(1, Math.round(h / 2));
+    view.lightmap.width = Math.max(1, Math.round(w / 4)); view.lightmap.height = Math.max(1, Math.round(h / 4));
     if (game) game.view = { w: w / view.scale, h: h / view.scale };
   }
   window.addEventListener('resize', resize);
@@ -187,23 +187,31 @@
     if (can) q.innerHTML = uiSvg('play', 'sm') + ' Продолжить: ' + esc(z === 5 ? LF.ENDLESS.name : LF.ZONES[z].name);
   }
   $('quick').addEventListener('click', function () { Audio.unlock(); Audio.play('click'); startRun(save.lastZone | 0); });
+  var codexTab = 'weapons';
   function renderCodex() {
-    var h = '<div class="sect">Оружие</div><div class="codex">';
-    Object.keys(LF.WEAPONS).forEach(function (k) {
-      var w = LF.WEAPONS[k], pair = w.pair && LF.PASSIVES[w.pair];
-      h += '<div class="cx"><b style="color:' + w.color + '">' + ico(k, w.icon, 24) + ' ' + esc(w.name) + '</b><small>' + esc(w.desc[0]) + '</small>' +
-        '<small class="evo">★ ' + esc(w.evo) + (pair ? ': ур. 5 + ' + ico(w.pair, pair.icon, 16) + ' ' + esc(pair.name) : '') + '</small></div>';
+    var tabs = [['weapons', 'Оружие (7)'], ['passives', 'Усиления (11)'], ['shrines', 'Алтари (4)'], ['bosses', 'Боссы (5)']];
+    var h = '<div class="codex-tabs">' + tabs.map(function (t) { return '<button class="ctab' + (codexTab === t[0] ? ' active' : '') + '" data-ctab="' + t[0] + '">' + t[1] + '</button>'; }).join('') + '</div><div class="codex">';
+    if (codexTab === 'weapons') {
+      Object.keys(LF.WEAPONS).forEach(function (k) {
+        var w = LF.WEAPONS[k], pair = w.pair && LF.PASSIVES[w.pair];
+        h += '<div class="cx"><b style="color:' + w.color + '">' + ico(k, w.icon, 24) + ' ' + esc(w.name) + '</b><small>' + esc(w.desc[0]) + '</small>' +
+          '<small class="evo">' + uiSvg('star', 'sm') + ' ' + esc(w.evo) + (pair ? ': ур. 5 + ' + ico(w.pair, pair.icon, 16) + ' ' + esc(pair.name) : '') + '</small></div>';
+      });
+    } else if (codexTab === 'passives') {
+      Object.keys(LF.PASSIVES).forEach(function (k) { var p = LF.PASSIVES[k]; h += '<div class="cx"><b>' + ico(k, p.icon, 24) + ' ' + esc(p.name) + '</b><small>' + esc(p.desc || '') + '</small></div>'; });
+    } else if (codexTab === 'shrines') {
+      Object.keys(LF.BLESSINGS).forEach(function (k) { var b = LF.BLESSINGS[k]; h += '<div class="cx"><b>' + uiSvg(k === 'lantern' ? 'burst' : k, 'sm') + ' ' + esc(b.name) + '</b><small>' + esc(b.desc) + '</small></div>'; });
+    } else {
+      LF.ZONES.forEach(function (z, i) {
+        var seen = save.cleared[i] || zoneUnlocked(i);
+        h += '<div class="cx' + (seen ? '' : ' locked') + '"><b style="color:' + z.pal.accent + '">' + (seen ? esc(z.boss.name) : '???') + '</b><small>' + (seen ? esc(z.name) + '. ' + esc(BOSS_HINTS[i]) : 'Откроется позже') + '</small></div>';
+      });
+    }
+    var box = $('codexbox');
+    box.innerHTML = h + '</div>';
+    box.querySelectorAll('[data-ctab]').forEach(function (btn) {
+      btn.addEventListener('click', function () { Audio.play('click'); codexTab = btn.getAttribute('data-ctab'); renderCodex(); });
     });
-    h += '</div><div class="sect">Усиления</div><div class="codex">';
-    Object.keys(LF.PASSIVES).forEach(function (k) { var p = LF.PASSIVES[k]; h += '<div class="cx"><b>' + ico(k, p.icon, 24) + ' ' + esc(p.name) + '</b><small>' + esc(p.desc || '') + '</small></div>'; });
-    h += '</div><div class="sect">Благословения алтарей</div><div class="codex">';
-    Object.keys(LF.BLESSINGS).forEach(function (k) { var b = LF.BLESSINGS[k]; h += '<div class="cx"><b>✧ ' + esc(b.name) + '</b><small>' + esc(b.desc) + '</small></div>'; });
-    h += '</div><div class="sect">Боссы</div><div class="codex">';
-    LF.ZONES.forEach(function (z, i) {
-      var seen = save.cleared[i] || zoneUnlocked(i);
-      h += '<div class="cx' + (seen ? '' : ' locked') + '"><b style="color:' + z.pal.accent + '">' + (seen ? esc(z.boss.name) : '???') + '</b><small>' + (seen ? esc(z.name) + '. ' + esc(BOSS_HINTS[i]) : 'Откроется позже') + '</small></div>';
-    });
-    $('codexbox').innerHTML = h + '</div>';
   }
 
   // ---------------- altar ----------------
@@ -605,8 +613,8 @@
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.fillStyle = '#07050b'; ctx.fillRect(0, 0, W, H);
     if (!tctx || current !== 'title') return;
-    if (titleFx.width !== Math.round(W * dpr) || titleFx.height !== Math.round(H * dpr)) { titleFx.width = Math.round(W * dpr); titleFx.height = Math.round(H * dpr); }
-    tctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (titleFx.width !== Math.round(W) || titleFx.height !== Math.round(H)) { titleFx.width = Math.round(W); titleFx.height = Math.round(H); }
+    tctx.setTransform(1, 0, 0, 1, 0, 0);
     tctx.clearRect(0, 0, W, H);
     // breathing lantern bloom centered near the keeper's lantern in keyart
     var pulse = 0.22 + 0.08 * Math.sin(t * 2.7) + 0.04 * Math.sin(t * 6.1);

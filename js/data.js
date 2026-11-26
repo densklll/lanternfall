@@ -2,7 +2,7 @@
 // Pure data, no DOM. Loaded both in the browser and in the node balance simulator.
 var LF = (typeof LF !== 'undefined') ? LF : {};
 
-LF.VERSION = '2.1.0';
+LF.VERSION = '2.1.1';
 
 // small seeded RNG (mulberry32): the daily challenge is the same for everyone on a given day
 LF.mulberry32 = function (a) {
@@ -192,11 +192,15 @@ LF.PROP_DATA = [
   { sz: [96, 90, 74, 78, 104, 64], w: [1.3, 1.1, 0.9, 1.5, 0.7, 2.8], solid: [18, 16, 18, 0, 18, 0] }
 ];
 LF.propHash = function (x, y) { var h = (x * 374761393 + y * 668265263) | 0; h = (h ^ (h >>> 13)) * 1274126177 | 0; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
+LF._propCache = new Map();
 LF.worldProp = function (artZ, ax, ay) {
+  var ck = ((artZ & 7) * 67108864) + ((ax + 4096) * 8192) + (ay + 4096);
+  var cached = LF._propCache.get(ck);
+  if (cached !== undefined) return cached;
   var h = LF.propHash(ax + 101, ay - 77);
-  if (h > 0.36) return null;
+  if (h > 0.36) { if (LF._propCache.size > 8000) LF._propCache.clear(); LF._propCache.set(ck, null); return null; }
   var ps = LF.PROP_CELL;
-  if (Math.abs(ax * ps) < 210 && Math.abs(ay * ps) < 210) return null; // keep spawn clear
+  if (Math.abs(ax * ps) < 210 && Math.abs(ay * ps) < 210) { LF._propCache.set(ck, null); return null; } // keep spawn clear
   var pd = LF.PROP_DATA[artZ] || LF.PROP_DATA[0], pw = pd.w, tot = 0;
   for (var q = 0; q < 6; q++) tot += pw[q];
   var pick = LF.propHash(ax * 13 + 5, ay * 17 + 3) * tot, idx = 0;
@@ -205,7 +209,10 @@ LF.worldProp = function (artZ, ax, ay) {
   var bx = ax * ps + 28 + LF.propHash(ax * 3, ay) * (ps - 56);
   var by = ay * ps + 28 + LF.propHash(ax, ay * 5) * (ps - 56);
   var sr = pd.solid[idx] ? Math.round(pd.solid[idx] * (sz / pd.sz[idx])) : 0;
-  return { idx: idx, x: bx, y: by, sz: sz, solid: sr, flip: LF.propHash(ax, ay * 3) < 0.5 };
+  var res = { idx: idx, x: bx, y: by, sz: sz, solid: sr, flip: LF.propHash(ax, ay * 3) < 0.5 };
+  if (LF._propCache.size > 8000) LF._propCache.clear();
+  LF._propCache.set(ck, res);
+  return res;
 };
 
 if (typeof module !== 'undefined') module.exports = LF;

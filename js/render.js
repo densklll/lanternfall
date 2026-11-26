@@ -9,13 +9,26 @@
   function hexA(hex, a) { var n = parseInt(hex.slice(1), 16); return 'rgba(' + (n >> 16 & 255) + ',' + (n >> 8 & 255) + ',' + (n & 255) + ',' + a + ')'; }
   R.hexA = hexA;
 
-  function glowSprite(color, size) {
-    var k = 'g' + color + size;
+  // One reusable 128x128 glow canvas per color (ZERO per-frame canvas leaks!)
+  function glowSprite(color) {
+    var k = 'g' + color;
     if (spriteCache[k]) return spriteCache[k];
-    var c = makeCanvas(size * 2, size * 2), x = c.getContext('2d');
-    var g = x.createRadialGradient(size, size, 0, size, size, size);
+    var s = 64, c = makeCanvas(s * 2, s * 2), x = c.getContext('2d');
+    var g = x.createRadialGradient(s, s, 0, s, s, s);
     g.addColorStop(0, hexA(color, 0.9)); g.addColorStop(0.25, hexA(color, 0.45)); g.addColorStop(1, hexA(color, 0));
-    x.fillStyle = g; x.fillRect(0, 0, size * 2, size * 2);
+    x.fillStyle = g; x.fillRect(0, 0, s * 2, s * 2);
+    spriteCache[k] = c; return c;
+  }
+  function drawGlow(ctx, color, x, y, r) {
+    ctx.drawImage(glowSprite(color), x - r, y - r, r * 2, r * 2);
+  }
+  function beamSprite(color) {
+    var k = 'bm' + color;
+    if (spriteCache[k]) return spriteCache[k];
+    var c = makeCanvas(38, 220), x = c.getContext('2d');
+    var g = x.createLinearGradient(0, 0, 0, 220);
+    g.addColorStop(0, hexA(color, 0)); g.addColorStop(0.6, hexA(color, 0.14)); g.addColorStop(1, hexA(color, 0.34));
+    x.fillStyle = g; x.fillRect(0, 0, 38, 220);
     spriteCache[k] = c; return c;
   }
   var lightPuff = (function () {
@@ -95,6 +108,7 @@
     spriteCache[k] = c; return c;
   }
 
+  var solidProps = [], yq = [];
   // ---- main draw ----
   R.draw = function (ctx, g, view, opts) {
     var W = view.cw, H = view.ch, sc = view.scale, dpr = view.dpr;
@@ -110,7 +124,7 @@
     var SP = window.LFSprites, ART = SP && SP.ready && !opts.noArt;
     var azi = LF.ZONES.indexOf(g.zone); if (azi < 0) azi = 5;
     var artZ = azi > 4 ? 4 : azi;
-    var solidProps = [];
+    solidProps.length = 0;
     if (ART) drawGroundArt(ctx, g, artZ, azi, camX, camY, vw, vh, t, view, solidProps);
     // ground patches + decorations
     var cs = 150, x0 = Math.floor(camX / cs) - 1, x1 = Math.floor((camX + vw) / cs) + 1, y0 = Math.floor(camY / cs) - 1, y1 = Math.floor((camY + vh) / cs) + 1;
@@ -160,7 +174,7 @@
           ctx.beginPath(); ctx.moveTo(cx2, cy2); ctx.lineTo(tx2, ty2); ctx.stroke();
           ctx.lineWidth = 7; ctx.strokeStyle = 'rgba(255,250,230,0.9)';
           ctx.beginPath(); ctx.moveTo(cx2, cy2); ctx.lineTo(cx2 + 20, cy2 - 58); ctx.stroke();
-          ctx.drawImage(glowSprite(z.color, 34), cx2 - 34, cy2 - 34);
+          drawGlow(ctx, z.color, cx2, cy2, 34);
           ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(cx2, cy2, 7.5, 0, TAU); ctx.fill();
           ctx.restore();
         } else {
@@ -199,20 +213,16 @@
           ctx.beginPath(); ctx.moveTo(gm.x, gm.y + bob); ctx.lineTo(gm.x - gm.vx * 0.035, gm.y - gm.vy * 0.035 + bob); ctx.stroke();
         }
         var tw = 0.75 + 0.25 * Math.sin(t * 6 + gi * 1.7);
-        ctx.globalAlpha = tw; ctx.drawImage(glowSprite(col, 14), gm.x - 14, gm.y - 14 + bob); ctx.globalAlpha = 1;
+        ctx.globalAlpha = tw; drawGlow(ctx, col, gm.x, gm.y + bob, 14); ctx.globalAlpha = 1;
         ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(gm.x, gm.y - s2 + bob); ctx.lineTo(gm.x + s2 * 0.7, gm.y + bob); ctx.lineTo(gm.x, gm.y + s2 + bob); ctx.lineTo(gm.x - s2 * 0.7, gm.y + bob); ctx.fill();
-      } else if (gm.kind === 'ember') { ctx.drawImage(glowSprite('#ff9a3c', 16), gm.x - 16, gm.y - 16 + bob); ctx.fillStyle = '#ffcf6b'; ctx.beginPath(); ctx.arc(gm.x, gm.y + bob, 4, 0, TAU); ctx.fill(); }
-      else if (gm.kind === 'heal') { ctx.drawImage(glowSprite('#7dff9a', 22), gm.x - 22, gm.y - 22 + bob); ctx.fillStyle = '#d9ffe2'; ctx.fillRect(gm.x - 2.5, gm.y - 8 + bob, 5, 16); ctx.fillRect(gm.x - 8, gm.y - 2.5 + bob, 16, 5); }
-      else if (gm.kind === 'magnet') { ctx.drawImage(glowSprite('#7ad7ff', 22), gm.x - 22, gm.y - 22 + bob); ctx.strokeStyle = '#e6f6ff'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(gm.x, gm.y + bob, 7, Math.PI, 0); ctx.stroke(); ctx.fillStyle = '#ff6b6b'; ctx.fillRect(gm.x - 9, gm.y + bob, 4, 5); ctx.fillRect(gm.x + 5, gm.y + bob, 4, 5); }
+      } else if (gm.kind === 'ember') { drawGlow(ctx, '#ff9a3c', gm.x, gm.y + bob, 16); ctx.fillStyle = '#ffcf6b'; ctx.beginPath(); ctx.arc(gm.x, gm.y + bob, 4, 0, TAU); ctx.fill(); }
+      else if (gm.kind === 'heal') { drawGlow(ctx, '#7dff9a', gm.x, gm.y + bob, 22); ctx.fillStyle = '#d9ffe2'; ctx.fillRect(gm.x - 2.5, gm.y - 8 + bob, 5, 16); ctx.fillRect(gm.x - 8, gm.y - 2.5 + bob, 16, 5); }
+      else if (gm.kind === 'magnet') { drawGlow(ctx, '#7ad7ff', gm.x, gm.y + bob, 22); ctx.strokeStyle = '#e6f6ff'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(gm.x, gm.y + bob, 7, Math.PI, 0); ctx.stroke(); ctx.fillStyle = '#ff6b6b'; ctx.fillRect(gm.x - 9, gm.y + bob, 4, 5); ctx.fillRect(gm.x + 5, gm.y + bob, 4, 5); }
       else if (gm.kind === 'shrine') {
         var sp = 1 + Math.sin(t * 3) * 0.08, fade = gm.age > 42 ? (Math.floor(t * 8) % 2 ? 0.4 : 1) : 1;
         ctx.globalAlpha = fade;
-        // Soft volumetric golden beacon shaft
-        if (!view.lowQuality) {
-          var sbg = ctx.createLinearGradient(gm.x, gm.y - 220, gm.x, gm.y + 12);
-          sbg.addColorStop(0, 'rgba(255,241,184,0)'); sbg.addColorStop(0.6, 'rgba(255,224,130,0.14)'); sbg.addColorStop(1, 'rgba(255,241,184,0.34)');
-          ctx.fillStyle = sbg; ctx.fillRect(gm.x - 19, gm.y - 220, 38, 232);
-        }
+        // Soft volumetric golden beacon shaft (cached sprite, zero per-frame gradient alloc!)
+        if (!view.lowQuality) ctx.drawImage(beamSprite('#ffe9a8'), gm.x - 19, gm.y - 210, 38, 220);
         // Rotating golden arcane rune circle on ground
         ctx.save(); ctx.translate(gm.x, gm.y + 8); ctx.scale(1, 0.55); ctx.rotate(t * 0.8);
         ctx.strokeStyle = 'rgba(255,232,150,0.6)'; ctx.lineWidth = 2;
@@ -224,7 +234,7 @@
           ctx.beginPath(); ctx.moveTo(Math.cos(sra) * 28, Math.sin(sra) * 28); ctx.lineTo(Math.cos(sra) * 41, Math.sin(sra) * 41); ctx.stroke();
         }
         ctx.restore();
-        ctx.drawImage(glowSprite('#ffe27a', 64 * sp), gm.x - 64 * sp, gm.y - 64 * sp);
+        drawGlow(ctx, '#ffe27a', gm.x, gm.y, 64 * sp);
         // Carved obsidian obelisk pedestal with golden runic trim
         ctx.fillStyle = '#1b1628'; ctx.fillRect(gm.x - 18, gm.y + 8, 36, 8);
         ctx.fillStyle = '#2d2642'; ctx.beginPath(); ctx.moveTo(gm.x - 14, gm.y + 8); ctx.lineTo(gm.x + 14, gm.y + 8); ctx.lineTo(gm.x + 10, gm.y - 8); ctx.lineTo(gm.x - 10, gm.y - 8); ctx.fill();
@@ -249,12 +259,8 @@
         ctx.globalAlpha = 1;
       }
       else if (gm.kind === 'chest') {
-        if (!view.lowQuality) {
-          var cbg = ctx.createLinearGradient(gm.x, gm.y - 150, gm.x, gm.y + 8);
-          cbg.addColorStop(0, 'rgba(255,210,63,0)'); cbg.addColorStop(0.7, 'rgba(255,210,63,0.12)'); cbg.addColorStop(1, 'rgba(255,210,63,0.28)');
-          ctx.fillStyle = cbg; ctx.fillRect(gm.x - 14, gm.y - 150, 28, 158);
-        }
-        ctx.drawImage(glowSprite('#ffd23f', 40), gm.x - 40, gm.y - 40 + bob); ctx.drawImage(chestSprite(), gm.x - 16, gm.y - 16 + bob, 32, 28);
+        if (!view.lowQuality) ctx.drawImage(beamSprite('#ffd23f'), gm.x - 14, gm.y - 148, 28, 156);
+        drawGlow(ctx, '#ffd23f', gm.x, gm.y + bob, 40); ctx.drawImage(chestSprite(), gm.x - 16, gm.y - 16 + bob, 32, 28);
       }
     }
 
@@ -274,8 +280,8 @@
         var sdx = se.x - p.x, sdy = se.y - p.y, sdl = Math.sqrt(sdx * sdx + sdy * sdy) || 1, sw2 = se.r * (se.boss ? 2.6 : 2.4);
         ctx.drawImage(SP.shadow, se.x - sw2 / 2 + sdx / sdl * 4, se.y + se.r * 0.55 - sw2 * 0.18 + sdy / sdl * 3, sw2, sw2 * 0.42);
       }
-      // Build unified Y-sorted draw queue: solid tall props + enemies + bosses + hero
-      var yq = [];
+      // Build unified Y-sorted draw queue (reused array, zero GC churn)
+      yq.length = 0;
       for (var spI = 0; spI < solidProps.length; spI++) yq.push(solidProps[spI]);
       for (var ei2 = 0; ei2 < g.enemies.length; ei2++) {
         var e2 = g.enemies[ei2];
@@ -337,7 +343,7 @@
     for (var wi = 0; wi < p.weapons.length; wi++) {
       var w = p.weapons[wi];
       if (w.key === 'orbit' && w.orbs) for (var oi = 0; oi < w.orbs.length; oi++) {
-        var o = w.orbs[oi]; ctx.drawImage(glowSprite(w.evo ? '#ffd23f' : '#ff9a4a', o.r * 2.6), o.x - o.r * 2.6, o.y - o.r * 2.6);
+        var o = w.orbs[oi]; drawGlow(ctx, w.evo ? '#ffd23f' : '#ff9a4a', o.x, o.y, o.r * 2.6);
         var fb = fireSprite(w.evo, (Math.floor(t * 12) + oi) % 3), fr = o.r * 1.5;
         ctx.drawImage(fb, o.x - fr, o.y - fr * 1.25, fr * 2, fr * 2);
       }
@@ -346,7 +352,7 @@
     ctx.globalCompositeOperation = 'lighter';
     for (var si = 0; si < g.shots.length; si++) {
       var s = g.shots[si];
-      ctx.drawImage(glowSprite(s.color, s.r * 3.2), s.x - s.r * 3.2, s.y - s.r * 3.2);
+      drawGlow(ctx, s.color, s.x, s.y, s.r * 3.2);
       if (s.type === 'spark') {
         var va = Math.atan2(s.vy, s.vx), bl = boltSprite(s.evo), L = s.r * 7, Wd = s.r * 2.6;
         ctx.save(); ctx.translate(s.x, s.y); ctx.rotate(va); ctx.drawImage(bl, -L * 0.82, -Wd / 2, L, Wd); ctx.restore();
@@ -366,7 +372,7 @@
           ctx.lineTo(B.x, B.y);
         }
         ctx.stroke(); ctx.strokeStyle = hexA(bm.color, a * 0.25); ctx.lineWidth = 9; ctx.stroke(); ctx.strokeStyle = 'rgba(255,255,255,' + a + ')'; ctx.lineWidth = 1.5; ctx.stroke();
-        for (var cp = 1; cp < bm.pts.length; cp++) ctx.drawImage(glowSprite(bm.color, 14), bm.pts[cp].x - 14, bm.pts[cp].y - 14);
+        for (var cp = 1; cp < bm.pts.length; cp++) drawGlow(ctx, bm.color, bm.pts[cp].x, bm.pts[cp].y, 14);
       } else if (bm.type === 'lance') {
         ctx.strokeStyle = hexA(bm.color, a * 0.22); ctx.lineWidth = bm.w * 3; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(bm.x, bm.y); ctx.lineTo(bm.x2, bm.y2); ctx.stroke();
         ctx.strokeStyle = hexA(bm.color, a * 0.6); ctx.lineWidth = bm.w * 1.5; ctx.stroke();
@@ -485,7 +491,7 @@
       ctx.textAlign = 'center';
       for (var ti = 0; ti < g.texts.length; ti++) {
         var tx = g.texts[ti]; ctx.globalAlpha = Math.min(1, tx.life * 2.5);
-        ctx.font = (tx.big ? '700 18px ' : '600 13px ') + '"Pixelify Sans", system-ui, sans-serif';
+        ctx.font = (tx.big ? '800 18px ' : '700 13px ') + '"Rubik", system-ui, sans-serif';
         ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillText(tx.s, tx.x + 1, tx.y + 1); ctx.fillStyle = tx.color; ctx.fillText(tx.s, tx.x, tx.y);
       }
       ctx.globalAlpha = 1;
@@ -558,7 +564,7 @@
 
   function drawBoss(ctx, b, g, t) {
     var r = b.r, col = b.color;
-    ctx.drawImage(glowSprite(col, r * 3), b.x - r * 3, b.y - r * 3);
+    drawGlow(ctx, col, b.x, b.y, r * 3);
     // rotating runes
     ctx.save(); ctx.translate(b.x, b.y);
     ctx.rotate(t * (b.enraged ? 1.6 : 0.6));
@@ -599,19 +605,19 @@
     if (c.width >= c.height) { w = size; h = size * c.height / c.width; } else { h = size; w = size * c.width / c.height; }
     var f = Math.floor(e.ph * (d.anim === 'flap' ? 14 : 8)) & 3, fx = e.x, fy = e.y + e.r * 0.62;
     if (d.anim === 'flap' || d.anim === 'float') fy -= e.r * 0.35;
-    if (e.elite) ctx.drawImage(glowSprite(e.affix === 'swift' ? '#7ad7ff' : '#ffd23f', e.r * 2.4), e.x - e.r * 2.4, e.y - e.r * 2.4);
-    if (e.type === 'charger' && e.st === 1) ctx.drawImage(glowSprite('#ff4d4d', e.r * 2.4), e.x - e.r * 2.4, e.y - e.r * 2.4);
+    if (e.elite) drawGlow(ctx, e.affix === 'swift' ? '#7ad7ff' : '#ffd23f', e.x, e.y, e.r * 2.4);
+    if (e.type === 'charger' && e.st === 1) drawGlow(ctx, '#ff4d4d', e.x, e.y, e.r * 2.4);
     if (e.affix === 'swift' && !view.lowQuality) { ctx.globalAlpha = 0.25; SP.drawAnim(ctx, c, fx - (e.vx || 0) * 0.05 - (p.x > e.x ? 6 : -6), fy, w, h, d.anim, (f + 1) & 3, e.ph - 0.12); ctx.globalAlpha = 1; }
     if (e.type === 'wraith') ctx.globalAlpha = 0.78 + Math.sin(e.ph * 3) * 0.15;
     if (e.flash > 0) { SP.drawAnim(ctx, SP.white(c), fx, fy + 1, w * 1.06, h * 0.94, d.anim, f, e.ph); ctx.globalAlpha = 1; return; }
     SP.drawAnim(ctx, c, fx, fy, w, h, d.anim, f, e.ph);
     ctx.globalAlpha = 1;
     if (e.elite) { ctx.globalAlpha = 0.65 + Math.sin(t * 6) * 0.25; SP.drawAnim(ctx, eliteCanvas(c, e.affix), fx, fy, w, h, d.anim, f, e.ph); ctx.globalAlpha = 1; }
-    // rim light from the lantern on the facing side
-    if (!view.lowQuality) {
+    // rim light from the lantern on the facing side (capped at 40 closest for high FPS)
+    if (!view.lowQuality && rimQ.length < 40) {
       var dx = p.x - e.x, dy = p.y - e.y, dd = Math.sqrt(dx * dx + dy * dy) || 1;
       if (dd < lightR) {
-        if (rimQ.length < 90) rimQ.push([SP.rim(c, '#ffcf8a'), fx + dx / dd * 1.6, fy + dy / dd * 1.6, w, h, d.anim, f, Math.min(0.85, (1 - dd / lightR) * 1.3), e.ph]);
+        rimQ.push([SP.rim(c, '#ffcf8a'), fx + dx / dd * 1.6, fy + dy / dd * 1.6, w, h, d.anim, f, Math.min(0.85, (1 - dd / lightR) * 1.3), e.ph]);
       }
     }
     if (e.elite) { var hpw = e.r * 2; ctx.fillStyle = 'rgba(6,4,10,0.75)'; ctx.fillRect(e.x - hpw / 2 - 1, e.y - e.r - h * 0.55 - 1, hpw + 2, 6); ctx.fillStyle = e.affix === 'swift' ? '#7ad7ff' : '#ffd23f'; ctx.fillRect(e.x - hpw / 2, e.y - e.r - h * 0.55, hpw * Math.max(0, e.hp / e.maxHp), 4); }
@@ -619,7 +625,7 @@
   function bossKey(g) { var zi = LF.ZONES.indexOf(g.zone); return zi < 0 ? 'b4' : 'b' + zi; }
   function drawBossArt(ctx, b, g, t, zi, view) {
     var SP = window.LFSprites, r = b.r, col = b.color, p = g.player;
-    ctx.drawImage(glowSprite(col, r * 3), b.x - r * 3, b.y - r * 3);
+    drawGlow(ctx, col, b.x, b.y, r * 3);
     ctx.save(); ctx.translate(b.x, b.y + r * 0.6); ctx.scale(1, 0.45); ctx.rotate(t * (b.enraged ? 1.6 : 0.6));
     ctx.strokeStyle = hexA(col, 0.55); ctx.lineWidth = 3;
     for (var i = 0; i < 8; i++) { ctx.rotate(TAU / 8); ctx.beginPath(); ctx.moveTo(r * 1.5, -7); ctx.lineTo(r * 1.7, 0); ctx.lineTo(r * 1.5, 7); ctx.stroke(); }
@@ -633,7 +639,7 @@
     ctx.drawImage(SP.shadow, b.x - r * 1.5, fy - r * 0.35, r * 3, r * 0.75);
     var ww = w * (2 - breathe), hh = h * breathe;
     if (b.st === 'tele' || b.st === 'dash' || b.st === 'spiral' || b.st === 'aimed') {
-      ctx.drawImage(glowSprite(b.st === 'tele' || b.st === 'dash' ? '#ff4d4d' : col, r * 2.3), b.x - r * 2.3, b.y - r * 2.3);
+      drawGlow(ctx, b.st === 'tele' || b.st === 'dash' ? '#ff4d4d' : col, b.x, b.y, r * 2.3);
     }
     ctx.save(); ctx.translate(b.x, fy + bobB); ctx.rotate(tiltB);
     ctx.drawImage(b.flash > 0 ? SP.white(c) : c, -ww / 2, -hh, ww, hh);
@@ -667,13 +673,13 @@
     var bob = p.moving ? [0, -2, 0, -2][f] : Math.sin(t * 2.4) * 1.2, footY = p.y + 16;
     ctx.drawImage(SP.shadow, p.x - 19, footY - 6, 38, 13);
     var lp = heroLanternPos(g, t);
-    ctx.drawImage(glowSprite('#ffc86a', 52 + Math.sin(t * 7) * 3), lp.x - 52, lp.y - 52);
+    drawGlow(ctx, '#ffc86a', lp.x, lp.y, 52 + Math.sin(t * 7) * 3);
     if (p.invuln > 0 && Math.floor(t * 30) % 2 === 0) { ctx.globalAlpha = 0.45; }
     var prevSm = ctx.imageSmoothingEnabled; ctx.imageSmoothingEnabled = false;
     ctx.drawImage(c, p.x - d.w / 2, footY - d.h + bob, d.w, d.h);
     ctx.imageSmoothingEnabled = prevSm;
     ctx.globalAlpha = 1;
-    ctx.globalCompositeOperation = 'lighter'; ctx.drawImage(glowSprite('#fff1c2', 11), lp.x - 11, lp.y - 11);
+    ctx.globalCompositeOperation = 'lighter'; drawGlow(ctx, '#fff1c2', lp.x, lp.y, 11);
     if (p.light >= 50 && !view.lowQuality) {
       var pr = 12 + (t * 18 % 14), pa = (1 - (pr - 12) / 14) * 0.42;
       ctx.strokeStyle = 'rgba(255,232,140,' + pa.toFixed(3) + ')'; ctx.lineWidth = 1.5;
