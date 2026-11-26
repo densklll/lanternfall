@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#07060c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Lanternfall: Последний свет</title>
+<meta name="description" content="Браузерный roguelite про последний фонарь в мире, который проглотила тьма">
+<meta property="og:title" content="Lanternfall: Последний свет">
+<meta property="og:description" content="Roguelite про последний фонарь против ночи. Играй прямо в браузере">
+<meta property="og:image" content="https://aivmake.ru/lanternfall/assets/keyart.jpg">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://aivmake.ru/lanternfall/">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><circle cx='32' cy='32' r='30' fill='%2307060c'/><rect x='24' y='20' width='16' height='24' rx='3' fill='%23ffe27a'/><rect x='22' y='16' width='20' height='5' fill='%238a7a5a'/><rect x='22' y='43' width='20' height='5' fill='%238a7a5a'/></svg>">
+<link rel="preload" href="assets/fonts/pixelify-cyr.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="style.css?v=7">
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="hud" class="hidden">
+  <div class="xpbar"><div id="xpfill"></div></div>
+  <div class="hud-top">
+    <div class="hud-left">
+      <div class="hpwrap"><div id="hpfill"></div><span id="hptext">100</span></div>
+      <div id="wslots" class="slots"></div>
+      <div id="pslots" class="slots small"></div>
+      <div id="lightwrap" class="lightwrap" title="Свет фонаря: 50% на вспышку (Пробел)"><div id="lightfill"></div><span id="lightlbl"><svg class="ui-svg sm gold" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 1l1.8 4.6L14.5 7.5 9.8 9.4 8 14.5 6.2 9.4 1.5 7.5l4.7-1.9z"/></svg></span></div>
+      <div id="buffs" class="buffs"></div>
+    </div>
+    <div class="hud-center"><div id="timer">00:00</div><div id="lvl">ур. 1</div></div>
+    <div class="hud-right">
+      <div class="stat-row"><svg class="ico-svg" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 1.5C4.7 1.5 2.5 3.8 2.5 6.8c0 1.8.8 3.2 2 4v2.2h7v-2.2c1.2-.8 2-2.2 2-4 0-3-2.2-5.3-5.5-5.3zm-2 6.3a1.3 1.3 0 1 1 0-2.6 1.3 1.3 0 0 1 0 2.6zm4 0a1.3 1.3 0 1 1 0-2.6 1.3 1.3 0 0 1 0 2.6z"/></svg> <span id="kills">0</span></div>
+      <div class="stat-row"><svg class="ico-svg ember" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 1.5L13 8l-5 6.5L3 8z"/><path fill="#fff3c4" opacity=".65" d="M8 3.6L10.6 8 8 10.6 5.4 8z"/></svg> <span id="embersrun">0</span></div>
+      <div class="hud-btns"><button id="mutebtn" class="iconbtn" aria-label="Звук"></button><button id="pausebtn" class="iconbtn" aria-label="Пауза"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="2.5" width="3.5" height="11" fill="currentColor"/><rect x="9.5" y="2.5" width="3.5" height="11" fill="currentColor"/></svg></button></div>
+    </div>
+  </div>
+  <div id="bossbar" class="hidden"><div class="bname" id="bossname"></div><div class="bbar"><div id="bossfill"></div></div></div>
+  <div id="toasts"></div>
+  <div id="hint" class="hint hidden"></div>
+  <button id="burstbtn" class="burstbtn" aria-label="Вспышка фонаря"><svg viewBox="0 0 16 16" width="28" height="28" aria-hidden="true"><path fill="currentColor" d="M8 1l1.8 4.6L14.5 7.5 9.8 9.4 8 14.5 6.2 9.4 1.5 7.5l4.7-1.9z"/></svg></button>
+</div>
+<div id="fps" class="fps hidden"></div>
+
+<!-- Title -->
+<div id="scr-title" class="screen">
+  <div class="title-bg"></div>
+  <canvas id="title-fx" class="title-fx"></canvas>
+  <div class="title-wrap">
+    <div class="logo"><span class="logo-main">LANTERNFALL</span><span class="logo-sub">Последний свет</span></div>
+    <div class="embers-total"><svg class="ui-svg sm ember" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 1.5L13 8l-5 6.5L3 8z"/><path fill="#fff3c4" opacity=".65" d="M8 3.6L10.6 8 8 10.6 5.4 8z"/></svg> <span class="embers-val">0</span> угольков</div>
+    <div class="menu">
+      <button class="btn primary hidden" id="quick">Продолжить</button>
+      <button class="btn primary" data-go="map">Играть</button>
+      <button class="btn" data-go="altar">Алтарь улучшений</button>
+      <div class="menu-row">
+        <button class="btn" data-go="ach">Достижения</button>
+        <button class="btn" data-go="codex">Книга света</button>
+      </div>
+      <div class="menu-row">
+        <button class="btn" data-go="how">Как играть</button>
+        <button class="btn" data-go="settings">Настройки</button>
+      </div>
+    </div>
+    <div class="title-icons"><button id="title-mute" class="iconbtn" aria-label="Звук"></button><button id="title-fs" class="iconbtn" aria-label="Во весь экран"><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10"/></svg></button></div>
+    <div class="foot">Версия <span id="ver"></span> · <a href="onepager.html">Ванпейджер</a> · <a href="aiprocess.html">Как сделано с AI</a></div>
+  </div>
+</div>
+
+<!-- Map / zone select -->
+<div id="scr-map" class="screen hidden">
+  <div class="panel wide">
+    <div class="panel-head"><button class="back" data-go="title">←</button><h2>Куда понесешь свет?</h2><div class="embers-total small"><svg class="ui-svg sm ember" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 1.5L13 8l-5 6.5L3 8z"/><path fill="#fff3c4" opacity=".65" d="M8 3.6L10.6 8 8 10.6 5.4 8z"/></svg> <span class="embers-val">0</span></div></div>
+    <div class="sect">Хранитель</div>
+    <div id="chars" class="chars"></div>
+    <div id="daily" class="dailybox"></div>
+    <div class="sect">Земли</div>
+    <div id="zones" class="zones"></div>
+  </div>
+</div>
+
+<!-- Altar -->
+<div id="scr-altar" class="screen hidden">
+  <div class="panel wide">
+    <div class="panel-head"><button class="back" data-go="title">←</button><h2>Алтарь улучшений</h2><div class="embers-total small"><svg class="ui-svg sm ember" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 1.5L13 8l-5 6.5L3 8z"/><path fill="#fff3c4" opacity=".65" d="M8 3.6L10.6 8 8 10.6 5.4 8z"/></svg> <span class="embers-val">0</span></div></div>
+    <p class="muted">Угольки остаются после каждого забега, даже если фонарь погас. Улучшения действуют всегда.</p>
+    <div id="metas" class="metas"></div>
+    <div class="row-end"><button id="refund" class="btn ghost small">Вернуть все угольки</button></div>
+  </div>
+</div>
+
+<!-- Achievements -->
+<div id="scr-ach" class="screen hidden">
+  <div class="panel wide">
+    <div class="panel-head"><button class="back" data-go="title">←</button><h2>Достижения</h2><div></div></div>
+    <div id="achs" class="achs"></div>
+    <div id="statsbox" class="statsbox"></div>
+  </div>
+</div>
+
+<!-- Codex -->
+<div id="scr-codex" class="screen hidden">
+  <div class="panel wide">
+    <div class="panel-head"><button class="back" data-go="title">←</button><h2>Книга света</h2><div></div></div>
+    <div id="codexbox"></div>
+  </div>
+</div>
+
+<!-- How to play -->
+<div id="scr-how" class="screen hidden">
+  <div class="panel">
+    <div class="panel-head"><button class="back" data-go="title">←</button><h2>Как играть</h2><div></div></div>
+    <div class="how">
+      <p><b>Ты последний фонарь.</b> Тьма съела мир, и только твой свет еще держит ее на расстоянии.</p>
+      <p><b>Двигайся</b> WASD или стрелками. На телефоне веди пальцем в любом месте экрана. Геймпад тоже работает.</p>
+      <p><b>Атакуешь автоматически.</b> Твоя задача выбирать позицию, собирать осколки света и не попадать в окружение.</p>
+      <p><b>Осколки дают уровни.</b> На каждом уровне выбираешь одно из улучшений: новое оружие или усиление.</p>
+      <p><b>Эволюция.</b> Прокачай оружие до 5 уровня и возьми парное усиление, тогда оружие переродится в легендарное.</p>
+      <p><b>Вспышка фонаря.</b> Свет копится сам и от осколков. Когда полоса ✦ заполнена наполовину, жми Пробел, Shift, кнопку ✦ на экране или A на геймпаде: волна света оглушит врагов и сотрет их снаряды. Но чем меньше света, тем ближе подступает тьма.</p>
+      <p><b>Алтари ✧</b> появляются раз в 75 секунд. Дойди до алтаря и получи благословение: ярость, скорость, эгиду или полный фонарь.</p>
+      <p><b>Через 5 минут приходит босс.</b> Победи его, и откроется следующая земля.</p>
+      <p><b>Угольки</b> копятся за каждый забег. Трать их на Алтаре, чтобы стать сильнее навсегда.</p>
+      <p class="muted">Пауза: Esc или P. Цифры 1-4 выбирают улучшение, R перебрасывает. M выключает звук, F открывает игру на весь экран, Enter в меню запускает следующий забег.</p>
+    </div>
+  </div>
+</div>
+
+<!-- Settings -->
+<div id="scr-settings" class="screen hidden">
+  <div class="panel">
+    <div class="panel-head"><button class="back" data-back="1">←</button><h2>Настройки</h2><div></div></div>
+    <label class="set">Музыка <input type="range" id="set-music" min="0" max="100"></label>
+    <label class="set">Звуки <input type="range" id="set-sfx" min="0" max="100"></label>
+    <label class="set chk"><input type="checkbox" id="set-shake"> Тряска экрана</label>
+    <label class="set chk"><input type="checkbox" id="set-numbers"> Цифры урона</label>
+    <label class="set chk"><input type="checkbox" id="set-vibrate"> Вибрация на телефоне</label>
+    <label class="set chk"><input type="checkbox" id="set-fps"> Показывать FPS</label>
+    <label class="set">Сложность <select id="set-diff"><option value="normal">Обычная</option><option value="easy">Легкая: враги слабее, угольков меньше</option></select></label>
+    <label class="set chk"><input type="checkbox" id="set-preview"> Режим обзора: открыть все земли и хранителей (не меняет прогресс)</label>
+    <div class="saveio"><div class="sect">Перенос прогресса</div>
+      <textarea id="save-io" rows="2" placeholder="Сюда появится код сохранения, или вставь свой код"></textarea>
+      <div class="row-end"><button id="save-export" class="btn small">Скопировать код</button><button id="save-import" class="btn small">Загрузить из кода</button></div></div>
+    <div class="row-end"><button id="reset" class="btn ghost small danger">Сбросить весь прогресс</button></div>
+  </div>
+</div>
+
+<!-- Level up -->
+<div id="scr-level" class="screen overlay hidden">
+  <div class="lvl-wrap">
+    <h2 class="glow">Новый уровень!</h2>
+    <div id="cards" class="cards"></div>
+    <button id="reroll" class="btn small">Перебросить (<span id="rerolls">0</span>)</button>
+  </div>
+</div>
+
+<!-- Pause -->
+<div id="scr-pause" class="screen overlay hidden">
+  <div class="panel narrow">
+    <h2>Пауза</h2>
+    <div id="pausebuild" class="pausebuild"></div>
+    <div id="pausestats" class="pausebuild stats"></div>
+    <div class="menu">
+      <button class="btn primary" id="resume">Продолжить</button>
+      <button class="btn" id="pause-settings">Настройки</button>
+      <button class="btn ghost" id="quit">Сдаться и выйти</button>
+    </div>
+  </div>
+</div>
+
+<!-- Results -->
+<div id="scr-result" class="screen overlay hidden">
+  <div class="panel narrow">
+    <h2 id="res-title">Фонарь погас</h2>
+    <div id="res-sub" class="muted center"></div>
+    <div id="res-stats" class="res-stats"></div>
+    <div id="res-unlocks" class="res-unlocks"></div>
+    <div class="menu">
+      <button class="btn primary" id="res-next">Дальше</button>
+      <button class="btn" id="res-again">Еще раз</button>
+      <button class="btn" id="res-altar">На Алтарь</button>
+      <button class="btn ghost" id="res-menu">В меню</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm -->
+<div id="scr-confirm" class="screen overlay hidden">
+  <div class="panel narrow"><h2 id="conf-title"></h2><p id="conf-text" class="muted center"></p>
+    <div class="menu"><button class="btn primary" id="conf-yes">Да</button><button class="btn" id="conf-no">Нет</button></div></div>
+</div>
+
+<div id="rotate-tip" class="hidden"></div>
+<div id="errbox" class="errbox hidden"><b>Что-то пошло не так</b><span id="errmsg"></span><div><button id="errreload" class="btn small primary">Перезагрузить</button><button id="errclose" class="btn small">Закрыть</button></div><small>Прогресс сохранен</small></div>
+<noscript>Для игры нужен включенный JavaScript</noscript>
+<script src="js/data.js?v=7"></script>
+<script src="js/game.js?v=7"></script>
+<script src="js/art.js?v=7"></script>
+<script src="js/sprites.js?v=7"></script>
+<script src="js/render.js?v=7"></script>
+<script src="js/audio.js?v=7"></script>
+<script src="js/main.js?v=7"></script>
+</body>
+</html>

@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lanternfall · Как я делал игру с AI</title>
+<meta property="og:title" content="Lanternfall: как я делал игру с AI">
+<meta property="og:image" content="https://aivmake.ru/lanternfall/assets/keyart.jpg">
+<style>
+  @font-face { font-family: 'Pixelify Sans'; font-weight: 400 700; font-display: swap; src: url(assets/fonts/pixelify-cyr.woff2) format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+  @font-face { font-family: 'Pixelify Sans'; font-weight: 400 700; font-display: swap; src: url(assets/fonts/pixelify-lat.woff2) format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212; }
+  @font-face { font-family: 'Rubik'; font-weight: 400 800; font-display: swap; src: url(assets/fonts/rubik-cyr.woff2) format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+  @font-face { font-family: 'Rubik'; font-weight: 400 800; font-display: swap; src: url(assets/fonts/rubik-lat.woff2) format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212; }
+
+  :root {
+    --bg: #0a0810; --bg-2: #110e1a; --card: #161221; --card-hi: #1d182b;
+    --gold: #f0c36a; --gold-hi: #ffebb8; --ember: #ff9436;
+    --text: #f3ece0; --text-2: #d6cee3; --muted: #a69dba;
+    --line: rgba(240, 195, 106, 0.22); --line-soft: rgba(255, 255, 255, 0.08);
+    --pix: 'Pixelify Sans', 'Rubik', system-ui, sans-serif;
+    --sans: 'Rubik', system-ui, -apple-system, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.65 var(--sans); -webkit-font-smoothing: antialiased; }
+  a { color: var(--gold); text-decoration: none; }
+  a:hover { color: var(--gold-hi); }
+
+  .topbar {
+    position: sticky; top: 0; z-index: 40;
+    background: rgba(10, 8, 16, 0.88); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .topbar-in {
+    max-width: 1140px; margin: 0 auto; padding: 12px 24px;
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-family: var(--pix); font-weight: 700; font-size: 18px; letter-spacing: 2px; color: var(--gold-hi); }
+  .brand-dot { width: 10px; height: 10px; background: var(--gold); box-shadow: 0 0 12px var(--ember); transform: rotate(45deg); display: inline-block; }
+  .nav-links { display: flex; align-items: center; gap: 22px; font-size: 14px; font-weight: 500; }
+  .nav-links a { color: var(--text-2); }
+  .nav-links a:hover { color: var(--gold-hi); }
+  .nav-cta { padding: 8px 16px; background: linear-gradient(180deg, #f6d178, #e48e32); color: #211003 !important; font-weight: 700; border-radius: 6px; }
+
+  .page-head {
+    background: radial-gradient(ellipse 65% 80% at 50% 0%, rgba(240, 195, 106, 0.12), transparent 70%), var(--bg-2);
+    border-bottom: 1px solid var(--line-soft); padding: 48px 24px 40px;
+  }
+  .page-head-in { max-width: 1140px; margin: 0 auto; }
+  .eyebrow {
+    display: inline-block; font-size: 12px; font-weight: 700; letter-spacing: 1.8px; text-transform: uppercase;
+    color: var(--gold); border: 1px solid var(--line); padding: 4px 10px; border-radius: 4px; margin-bottom: 12px;
+  }
+  h1 { margin: 0; font-family: var(--pix); font-size: clamp(32px, 5vw, 52px); color: var(--gold-hi); letter-spacing: 2px; line-height: 1.05; }
+  .lead { margin: 12px 0 0; font-size: 17px; color: var(--text-2); max-width: 760px; }
+
+  main { max-width: 1140px; margin: 0 auto; padding: 0 24px 80px; }
+  section { margin-top: 56px; }
+  h2 { margin: 0 0 18px; font-family: var(--pix); font-size: clamp(22px, 3vw, 30px); color: var(--text); letter-spacing: 1px; }
+  .sec-num { color: var(--ember); margin-right: 10px; }
+  code { background: var(--card-hi); border: 1px solid var(--line-soft); padding: 1px 6px; border-radius: 4px; font-size: 13.5px; color: var(--gold-hi); }
+
+  /* Pipeline Steps 2-col */
+  .steps { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+  .step {
+    background: var(--card); border: 1px solid var(--line-soft); border-radius: 8px;
+    padding: 20px; display: flex; gap: 16px; align-items: flex-start;
+  }
+  .step-n {
+    font-family: var(--pix); font-size: 24px; font-weight: 700; color: var(--ember);
+    background: var(--card-hi); border: 1px solid var(--line); border-radius: 6px;
+    min-width: 48px; height: 48px; display: grid; place-items: center; flex-shrink: 0;
+  }
+  .step h3 { margin: 0 0 6px; font-size: 16px; color: var(--gold-hi); }
+  .step p { margin: 0; font-size: 14px; color: var(--text-2); }
+
+  /* Sim Chart + Table */
+  .sim-panel { background: var(--card); border: 1px solid var(--line-soft); border-radius: 8px; padding: 24px; }
+  .sim-sub { color: var(--muted); font-size: 14px; margin: 0 0 18px; }
+  .runs { display: flex; flex-direction: column; gap: 8px; }
+  .run-row {
+    display: grid; grid-template-columns: 34px 76px 140px 1fr; align-items: center; gap: 12px;
+    padding: 8px 10px; background: var(--bg-2); border: 1px solid var(--line-soft); border-radius: 6px; font-size: 13.5px;
+  }
+  .run-id { font-family: var(--pix); color: var(--gold); font-weight: 700; }
+  .run-min { font-family: var(--pix); color: var(--gold-hi); font-weight: 700; }
+  .run-bar-wrap { height: 10px; background: rgba(255, 255, 255, 0.06); border-radius: 3px; position: relative; overflow: hidden; }
+  .run-bar { height: 100%; background: linear-gradient(90deg, var(--ember), var(--gold)); border-radius: 3px; }
+  .run-seq { color: var(--text-2); font-size: 13px; }
+  .sim-foot { margin: 16px 0 0; font-size: 14px; color: var(--muted); }
+
+  /* Split Responsibility */
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .box { background: var(--card); border: 1px solid var(--line-soft); border-radius: 8px; padding: 22px 24px; }
+  .box.hi { border-color: var(--line); }
+  .box h3 { margin: 0 0 12px; font-size: 18px; color: var(--gold-hi); }
+  .box ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 9px; }
+  .box li { position: relative; padding-left: 20px; font-size: 14.5px; color: var(--text-2); }
+  .box li::before { content: '✦'; position: absolute; left: 0; color: var(--gold); font-size: 12px; }
+
+  .scale-box {
+    background: linear-gradient(90deg, rgba(240, 195, 106, 0.09), var(--card) 55%);
+    border: 1px solid var(--line); border-left: 4px solid var(--gold); border-radius: 8px; padding: 22px 24px;
+  }
+  .scale-box p { margin: 0; font-size: 15px; color: var(--text-2); }
+
+  footer {
+    max-width: 1140px; margin: 0 auto; padding: 26px 24px 48px;
+    border-top: 1px solid var(--line-soft); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;
+    font-size: 13.5px; color: var(--muted);
+  }
+  .foot-links { display: flex; gap: 18px; flex-wrap: wrap; }
+
+  @media (max-width: 860px) {
+    .steps, .split { grid-template-columns: 1fr; }
+    .run-row { grid-template-columns: 30px 64px 90px 1fr; gap: 8px; }
+  }
+  @media (max-width: 600px) {
+    .nav-links a:not(.nav-cta) { display: none; }
+    .run-row { grid-template-columns: 28px 60px 1fr; }
+    .run-bar-wrap { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="topbar">
+  <div class="topbar-in">
+    <a class="brand" href="./"><i class="brand-dot"></i> LANTERNFALL</a>
+    <div class="nav-links">
+      <a href="onepager.html">Ванпейджер</a>
+      <a href="#steps">Пайплайн</a>
+      <a href="#sim">Симулятор</a>
+      <a href="#split">Роли</a>
+      <a class="nav-cta" href="./">Играть</a>
+    </div>
+  </div>
+</nav>
+
+<header class="page-head">
+  <div class="page-head-in">
+    <span class="eyebrow">AI Game Development · R&amp;D Case Study</span>
+    <h1>Как я делал Lanternfall с AI</h1>
+    <p class="lead">Всю игру я собрал один, используя AI-агентов в роли инженерной и контентной команды: программист, художник, звукорежиссер, тестировщик и аналитик баланса. Моя часть: концепция, архитектура под AI-итерации, критерии качества, плейтест и каждое продуктовое решение.</p>
+  </div>
+</header>
+
+<main>
+  <section id="steps">
+    <h2><span class="sec-num">01</span>Пайплайн разработки по шагам</h2>
+    <div class="steps">
+      <div class="step"><div class="step-n">01</div><div><h3>Концепт и ограничения</h3><p>Сформулировал ядро: survivors-like, где свет одновременно оружие, обзор и расходный ресурс. Ритм «5 минут и босс». Жесткие рамки для агента: чистый JS без движка, симуляция без DOM, все данные в одном файле.</p></div></div>
+      <div class="step"><div class="step-n">02</div><div><h3>Архитектура под AI</h3><p>Логика игры (<code>js/game.js</code>) не знает про экран и браузер, поэтому агент гоняет ее в Node.js. Главное инженерное решение: баланс и регрессии проверяются кодом и цифрами, а не на глаз.</p></div></div>
+      <div class="step"><div class="step-n">03</div><div><h3>Контент короткими итерациями</h3><p>Оружие, врагов, боссов и UI агент писал по коротким ТЗ. После каждой итерации я играл руками на ПК и телефоне и выдавал точечные правки: защита от случайного тапа, читаемость HUD, темп боссов.</p></div></div>
+      <div class="step"><div class="step-n">04</div><div><h3>Баланс headless-симулятором</h3><p>Агент написал бота (<code>sim.js</code> и <code>campaign.js</code>), который играет реальной логикой всю кампанию с покупками на Алтаре. Я задавал целевые коридоры: кампания от 30 минут даже без смертей, без непроходимых стен.</p></div></div>
+      <div class="step"><div class="step-n">05</div><div><h3>Процедурный звук на WebAudio</h3><p>Все звуки и генеративная музыка синтезируются в реальном времени без аудиофайлов. Я описывал настроение земли («болото, вода, тревожно»), агент подбирал лад, темп и тембры.</p></div></div>
+      <div class="step"><div class="step-n">06</div><div><h3>Арт-пайплайн и пиксель-арт</h3><p>В v1.2 заменили процедурные кружки на цельный пиксель-арт: листы спрайтов героя, 8 врагов, 5 боссов, тайлов и иконок + Python-скрипты (<code>tools/build_art.py</code>, <code>build_ui.py</code>) для вырезки, единой палитры и бесшовных тайлов.</p></div></div>
+      <div class="step"><div class="step-n">07</div><div><h3>Полировка геймфила (v1.3.0)</h3><p>Аудит по критериям оценки: хит-стоп на ключевых событиях, световые лучи-маяки над алтарями и сундуками, подсказки пар эволюции на карточках оружия, единые SVG-иконки HUD и «Режим обзора» в настройках.</p></div></div>
+      <div class="step"><div class="step-n">08</div><div><h3>Автотесты и безопасный деплой</h3><p>22 юнит-теста (<code>tests/unit.js</code>), браузерные проверки на ПК и мобиле, отдельный Docker-контейнер с сохранением предыдущей сборки для мгновенного отката.</p></div></div>
+    </div>
+  </section>
+
+  <section id="sim">
+    <h2><span class="sec-num">02</span>Прогоны кампании headless-ботом</h2>
+    <div class="sim-panel">
+      <p class="sim-sub">Бот проходит игру с нуля до финального босса, покупает улучшения на Алтаре между забегами и применяет вспышку фонаря. Время включает 15 секунд меню между забегами. Обычная сложность, 10 полных кампаний.</p>
+      <div class="runs">
+        <div class="run-row"><span class="run-id">#01</span><span class="run-min">38 мин</span><div class="run-bar-wrap"><div class="run-bar" style="width:74%"></div></div><span class="run-seq">6 забегов: ✗ Роща ✓ Роща ✓ Руины ✓ Пустоши ✓ Перевал ✓ Сердце</span></div>
+        <div class="run-row"><span class="run-id">#02</span><span class="run-min">31 мин</span><div class="run-bar-wrap"><div class="run-bar" style="width:61%"></div></div><span class="run-seq">5 забегов: ✓ Роща ✓ Руины ✓ Пустоши ✓ Перевал ✓ Сердце</span></div>
+        <div class="run-row"><span class="run-id">#03</span><span class="run-min">32 мин</span><div class="run-bar-wrap"><div class="run-bar" style="width:63%"></div></div><span class="run-seq">5 забегов: ✓ Роща ✓ Руины ✓ Пустоши ✓ Перевал ✓ Сердце</span></div>
+        <div class="run-row"><span class="run-id">#04</span><span class="run-min">46 мин</span><div class="run-bar-wrap"><div class="run-bar" style="width:90%"></div></div><span class="run-seq">10 забегов: ✓ Роща ✗ Руины ✓ Руины ✗ Пустоши ✓ Пустоши ✗ Перевал ✓ Перевал ✗ Сердце ✗ Сердце ✓ Сердце</span></div>
+        <div class="run-row"><span class="run-id">#05</span><span class="run-min">39 мин</span><div class="run-bar-wrap"><div class="run-bar" style="width:76%"></div></div><span class="run-seq">7 забегов: ✓ Роща ✗ Руины ✓ Руины ✓ Пустоши ✗ Перевал ✓ Перевал ✓ Сердце</span></div>
+        <div class="run-row"><span class="run-id">#06</span><span class="run-min">41 мин</span><div class="run-bar-wrap"><div class="run-bar" style="width:80%"></div></div><span class="run-seq">8 забегов: ✓ Роща ✓ Руины ✗ Пустоши ✓ Пустоши ✓ Перевал ✗ Сердце ✗ Сердце ✓ Сердце</span></div>
+        <div class="run-row"><span class="run-id">#07</span><span class="run-min">51 мин</span><div class="run-bar-wrap"><div class="run-bar" style="width:100%"></div></div><span class="run-seq">9 забегов: ✓ Роща ✓ Руины ✗ Пустоши ✗ Пустоши ✗ Пустоши ✗ Пустоши ✓ Пустоши ✓ Перевал ✓ Сердце</span></div>
+        <div class="run-row"><span class="run-id">#08</span><span class="run-min">39 мин</span><div class="run-bar-wrap"><div class="run-bar" style="width:76%"></div></div><span class="run-seq">8 забегов: ✓ Роща ✗ Руины ✓ Руины ✗ Пустоши ✗ Пустоши ✓ Пустоши ✓ Перевал ✓ Сердце</span></div>
+        <div class="run-row"><span class="run-id">#09</span><span class="run-min">46 мин</span><div class="run-bar-wrap"><div class="run-bar" style="width:90%"></div></div><span class="run-seq">7 забегов: ✗ Роща ✓ Роща ✓ Руины ✗ Пустоши ✓ Пустоши ✓ Перевал ✓ Сердце</span></div>
+        <div class="run-row"><span class="run-id">#10</span><span class="run-min">51 мин</span><div class="run-bar-wrap"><div class="run-bar" style="width:100%"></div></div><span class="run-seq">10 забегов: ✓ Роща ✗ Руины ✓ Руины ✗ Пустоши ✓ Пустоши ✗ Перевал ✗ Перевал ✗ Перевал ✓ Перевал ✓ Сердце</span></div>
+      </div>
+      <p class="sim-foot"><b>Итог:</b> 5-10 забегов, 31-51 минута (среднее ~40 минут). Нижняя граница это идеальный прогон без поражений. У живого игрока выходит дольше, плюс Испытание дня и Вечная ночь. На легкой сложности: 31-38 минут.</p>
+    </div>
+  </section>
+
+  <section id="split">
+    <h2><span class="sec-num">03</span>Распределение работы: AI и автор</h2>
+    <div class="split">
+      <div class="box">
+        <h3>AI-агенты и пайплайн</h3>
+        <ul>
+          <li>Реализация всех игровых систем и UI по коротким ТЗ</li>
+          <li>Генерация листов спрайтов, тайлов, иконок, key art и Python-обработка</li>
+          <li>Карта динамического света, частицы и эффекты Canvas 2D</li>
+          <li>Синтез звуков и генеративная музыка на WebAudio</li>
+          <li>Headless-симулятор баланса, 22 юнит-теста и браузерные проверки</li>
+          <li>Docker-контейнер и скрипт безопасного деплоя с откатом</li>
+        </ul>
+      </div>
+      <div class="box hi">
+        <h3>Мои решения и контроль</h3>
+        <ul>
+          <li>Концепция, сеттинг, механика света как ресурса и 5-минутный ритм</li>
+          <li>Архитектура с разделением симуляции и рендера под автобаланс</li>
+          <li>Цели баланса и итерации по цифрам симулятора</li>
+          <li>Плейтест на ПК и телефоне, аудит геймфила, UX и контраста</li>
+          <li>Коммерческое позиционирование, скоуп и план производства на 6 месяцев</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="sec-num">04</span>Масштабирование на полную игру</h2>
+    <div class="scale-box">
+      <p>Тот же R&amp;D-процесс напрямую переносится на Godot 4 или Unity: игровая логика отделена от движкового рендера, весь контент лежит в данных, а бот и автотесты прогоняют каждый билд. Один разработчик с AI-агентами держит темп небольшой команды и тратит время на геймдизайн и качество ощущений, а не на рутину.</p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div>Lanternfall v2.0.0 · Денис Колмыков · Telegram @densklll</div>
+  <div class="foot-links">
+    <a href="./">Играть в прототип</a>
+    <a href="onepager.html">Ванпейджер и план</a>
+    <a href="lanternfall-src.zip">Скачать исходники</a>
+  </div>
+</footer>
+</body>
+</html>
