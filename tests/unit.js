@@ -91,5 +91,20 @@ t('v1.3 noFx mode skips hitStop so simulator stays deterministic', () => {
   g.player.light = 100; g.lanternBurst();
   assert.strictEqual(g.hitStop, 0);
 });
+t('v2.1 solid world props push player out smoothly and keep spawn clear', () => {
+  const g = mk();
+  assert.strictEqual(LF.worldProp(0, 0, 0), null, 'spawn cell must be clear');
+  let found = null;
+  for (let ax = -10; ax <= 10 && !found; ax++) for (let ay = -10; ay <= 10 && !found; ay++) {
+    const pr = LF.worldProp(0, ax, ay);
+    if (pr && pr.solid > 0) found = pr;
+  }
+  assert.ok(found, 'must have solid props');
+  const ox = found.x, oy = found.y - found.solid * 0.45;
+  g.player.x = ox + 2; g.player.y = oy;
+  g.resolveObstacles(g.player, g.player.r);
+  const d = Math.hypot(g.player.x - ox, g.player.y - oy);
+  assert.ok(d >= g.player.r + found.solid - 0.1, 'player must be pushed outside solid prop: ' + d);
+});
 console.log(`\n${n - failed}/${n} passed`);
 process.exit(failed ? 1 : 0);

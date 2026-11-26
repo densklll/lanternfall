@@ -92,45 +92,42 @@
     x.setTransform(1, 0, 0, 0.5, 0, 8); x.fillStyle = g; x.beginPath(); x.arc(32, 16, 32, 0, Math.PI * 2); x.fill(); return c;
   })();
 
-  // draw a sprite with smooth expressive animation, anchored at its feet (x, y)
+  // draw a sprite with smooth, artifact-free animation, anchored at its feet (x, y)
   // style: legs | squash | flap | float
   S.drawAnim = function (ctx, c, x, y, w, h, style, f, ph) {
     var p = (ph !== undefined) ? ph : (f * 1.57);
-    ctx.save();
     if (style === 'squash') {
-      var s = Math.sin(p * 8);
-      var sx = 1 + s * 0.1, sy = 1 - s * 0.09;
-      ctx.translate(x, y);
-      ctx.rotate(Math.cos(p * 8) * 0.06);
-      ctx.drawImage(c, -w * sx / 2, -h * sy, w * sx, h * sy);
+      var s = Math.sin(p * 7.5);
+      var sx = 1 + s * 0.08, sy = 1 - s * 0.07;
+      ctx.drawImage(c, x - w * sx / 2, y - h * sy, w * sx, h * sy);
     } else if (style === 'flap') {
-      var fl = Math.sin(p * 14);
-      var fy = 0.82 + fl * 0.22, fx = 1.04 - fl * 0.08, lift = -fl * 4.5;
-      ctx.translate(x, y - h * 0.5 + lift);
-      ctx.rotate(Math.cos(p * 7) * 0.1);
-      ctx.drawImage(c, -w * fx / 2, -h * fy / 2, w * fx, h * fy);
+      var fl = Math.sin(p * 13);
+      var fy = 0.84 + fl * 0.18, fx = 1.03 - fl * 0.06, lift = -fl * 4;
+      ctx.drawImage(c, x - w * fx / 2, y - h * (0.5 + fy / 2) + lift, w * fx, h * fy);
     } else if (style === 'float') {
-      var bob = Math.sin(p * 4.2) * 4.5, tilt = Math.sin(p * 2.4) * 0.065;
-      ctx.translate(x, y + bob);
-      ctx.rotate(tilt);
-      ctx.drawImage(c, -w / 2, -h, w, h);
+      var bob = Math.sin(p * 4) * 4;
+      ctx.drawImage(c, x - w / 2, y - h + bob, w, h);
     } else {
-      // heavy stomping walk (brute, charger)
-      var st = Math.sin(p * 9.5), hop = Math.abs(st) * 4.5, lean = st * 0.085;
-      ctx.translate(x, y - hop);
-      ctx.rotate(lean);
-      ctx.drawImage(c, -w / 2, -h, w, h);
+      var st = Math.sin(p * 9), hop = Math.abs(st) * 3.5;
+      ctx.drawImage(c, x - w / 2, y - h - hop, w, h);
     }
-    ctx.restore();
   };
 
-  // lantern position inside the hero sprite (found once from the warm bright pixels)
-  S.heroLantern = [0.82, 0.7];
+  // lantern position inside each hero walk frame (found once from warm bright pixels)
+  S.heroLantern = [0.78, 0.62];
+  S.heroLanterns = [[0.78, 0.62], [0.72, 0.72], [0.78, 0.64], [0.76, 0.60]];
   function prep() {
     try {
-      var h0 = S.base('hero', 'h0'), x = h0.getContext('2d'), d = x.getImageData(0, 0, h0.width, h0.height).data, sx = 0, sy = 0, n = 0;
-      for (var y = 0; y < h0.height; y++) for (var xx = 0; xx < h0.width; xx++) { var i = (y * h0.width + xx) * 4; if (d[i + 3] > 128 && d[i] > 220 && d[i + 1] > 170 && d[i + 2] < 150) { sx += xx; sy += y; n++; } }
-      if (n > 4) S.heroLantern = [sx / n / h0.width, sy / n / h0.height];
+      for (var fi = 0; fi < 4; fi++) {
+        var hf = S.base('hero', 'h' + fi); if (!hf) continue;
+        var x = hf.getContext('2d'), d = x.getImageData(0, 0, hf.width, hf.height).data, sx = 0, sy = 0, n = 0;
+        for (var y = Math.floor(hf.height * 0.35); y < hf.height; y++) for (var xx = Math.floor(hf.width * 0.55); xx < hf.width; xx++) {
+          var i = (y * hf.width + xx) * 4;
+          if (d[i + 3] > 128 && d[i] > 215 && d[i + 1] > 165 && d[i + 2] < 140) { sx += xx; sy += y; n++; }
+        }
+        if (n > 4) S.heroLanterns[fi] = [sx / n / hf.width, sy / n / hf.height];
+      }
+      S.heroLantern = S.heroLanterns[0];
     } catch (e) {}
   }
 

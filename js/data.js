@@ -2,7 +2,7 @@
 // Pure data, no DOM. Loaded both in the browser and in the node balance simulator.
 var LF = (typeof LF !== 'undefined') ? LF : {};
 
-LF.VERSION = '2.0.0';
+LF.VERSION = '2.1.0';
 
 // small seeded RNG (mulberry32): the daily challenge is the same for everyone on a given day
 LF.mulberry32 = function (a) {
@@ -181,5 +181,31 @@ LF.ACHIEVEMENTS = [
   { id: 'daily', name: 'Испытание дня', desc: 'Пройди зону с модификатором дня', reward: 80, test: function (r) { return r.challenge && r.won; } },
   { id: 'endless10', name: 'Вечный фонарь', desc: 'Продержись 10 минут в Вечной ночи', reward: 150, test: function (r) { return r.endless && r.time >= 600; } }
 ];
+
+// Deterministic world prop placement (shared by game.js collision and render.js Y-sorting)
+LF.PROP_CELL = 190;
+LF.PROP_DATA = [
+  { sz: [100, 84, 72, 54, 96, 74], w: [1.1, 1.0, 2.0, 3.8, 0.9, 1.4], solid: [20, 18, 0, 0, 18, 0] },
+  { sz: [108, 92, 108, 80, 56, 108], w: [1.0, 0.7, 1.2, 1.8, 3.2, 0.6], solid: [20, 22, 0, 18, 0, 22] },
+  { sz: [106, 86, 72, 72, 82, 92], w: [1.1, 1.3, 2.4, 0.9, 1.1, 0.7], solid: [16, 20, 0, 18, 20, 20] },
+  { sz: [90, 82, 106, 58, 78, 84], w: [1.2, 1.3, 1.0, 2.2, 2.0, 0.6], solid: [18, 20, 15, 16, 0, 13] },
+  { sz: [96, 90, 74, 78, 104, 64], w: [1.3, 1.1, 0.9, 1.5, 0.7, 2.8], solid: [18, 16, 18, 0, 18, 0] }
+];
+LF.propHash = function (x, y) { var h = (x * 374761393 + y * 668265263) | 0; h = (h ^ (h >>> 13)) * 1274126177 | 0; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
+LF.worldProp = function (artZ, ax, ay) {
+  var h = LF.propHash(ax + 101, ay - 77);
+  if (h > 0.36) return null;
+  var ps = LF.PROP_CELL;
+  if (Math.abs(ax * ps) < 210 && Math.abs(ay * ps) < 210) return null; // keep spawn clear
+  var pd = LF.PROP_DATA[artZ] || LF.PROP_DATA[0], pw = pd.w, tot = 0;
+  for (var q = 0; q < 6; q++) tot += pw[q];
+  var pick = LF.propHash(ax * 13 + 5, ay * 17 + 3) * tot, idx = 0;
+  while (idx < 5 && pick > pw[idx]) { pick -= pw[idx]; idx++; }
+  var sz = pd.sz[idx] * (0.86 + LF.propHash(ax * 7, ay * 7) * 0.28);
+  var bx = ax * ps + 28 + LF.propHash(ax * 3, ay) * (ps - 56);
+  var by = ay * ps + 28 + LF.propHash(ax, ay * 5) * (ps - 56);
+  var sr = pd.solid[idx] ? Math.round(pd.solid[idx] * (sz / pd.sz[idx])) : 0;
+  return { idx: idx, x: bx, y: by, sz: sz, solid: sr, flip: LF.propHash(ax, ay * 3) < 0.5 };
+};
 
 if (typeof module !== 'undefined') module.exports = LF;

@@ -42,8 +42,30 @@
     this.computeStats();
     this.player.hp = this.stats.maxHp;
     this.grid = new Map();
+    var azi = LF.ZONES.indexOf(this.zone);
+    this.artZ = azi < 0 || azi > 4 ? 4 : azi;
   }
   var P = Game.prototype;
+
+  // Smooth circle-vs-circle pushout against solid world props (stumps, boulders, ruins, pillars)
+  P.resolveObstacles = function (ent, r) {
+    if (!LF.worldProp) return;
+    var ps = LF.PROP_CELL, cx = Math.floor(ent.x / ps), cy = Math.floor(ent.y / ps);
+    for (var ax = cx - 1; ax <= cx + 1; ax++) {
+      for (var ay = cy - 1; ay <= cy + 1; ay++) {
+        var pr = LF.worldProp(this.artZ, ax, ay);
+        if (!pr || !pr.solid) continue;
+        // Obstacle base circle sits slightly above footY
+        var ox = pr.x, oy = pr.y - pr.solid * 0.45, rr = r + pr.solid;
+        var dx = ent.x - ox, dy = ent.y - oy, d2 = dx * dx + dy * dy;
+        if (d2 < rr * rr) {
+          var d = Math.sqrt(d2) || 0.001;
+          ent.x = ox + dx / d * rr;
+          ent.y = oy + dy / d * rr;
+        }
+      }
+    }
+  };
 
   P.xpFor = function (lv) { return Math.round(3 + lv * 2.5 + lv * lv * 0.45); };
 
@@ -360,7 +382,9 @@
     if (t >= this.nextShrine && !this.boss) {
       this.nextShrine += 75;
       var sa = this.rand() * TAU, sd = 420 + this.rand() * 160, pl = this.player;
-      this.gems.push({ x: pl.x + Math.cos(sa) * sd, y: pl.y + Math.sin(sa) * sd, kind: 'shrine', v: 1, pull: false, vx: 0, vy: 0, age: 0 });
+      var shPos = { x: pl.x + Math.cos(sa) * sd, y: pl.y + Math.sin(sa) * sd };
+      this.resolveObstacles(shPos, 30);
+      this.gems.push({ x: shPos.x, y: shPos.y, kind: 'shrine', v: 1, pull: false, vx: 0, vy: 0, age: 0 });
       if (this.hooks.toast) this.hooks.toast('Где-то рядом загорелся алтарь света');
     }
     if (!z.endless && t >= LF.RUN_TIME && !this.boss && !this.bossKilled) this.spawnBoss(z.boss, 1);
@@ -500,6 +524,7 @@
           else if (e.stT <= 0 && d < 300) { e.st = 1; e.stT = 0.6; e.cx = ux; e.cy = uy; }
         }
         e.x += (mx * sp + e.kx) * dt; e.y += (my * sp + e.ky) * dt;
+        if (e.shape !== 'bat' && e.shape !== 'ghost') this.resolveObstacles(e, e.r);
         var damp = Math.pow(0.0005, dt); e.kx *= damp; e.ky *= damp;
       }
       // contact damage
@@ -893,6 +918,7 @@
     if (p.moving) { p.fx = ix / il; p.fy = iy / il; }
     p.speedNow = s.speed * il;
     p.x += ix * s.speed * dt; p.y += iy * s.speed * dt;
+    this.resolveObstacles(p, p.r);
     p.anim += dt * (p.moving ? 8 : 3);
     p.invuln -= dt;
     if (s.regen > 0 && p.hp < p.maxHp) p.hp = Math.min(p.maxHp, p.hp + s.regen * dt);
