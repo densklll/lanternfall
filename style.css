@@ -410,5 +410,8 @@ body.touch .burstbtn { display: grid; }
 .how-card p { margin: 0; font-size: 14px; line-height: 1.5; color: #ddd5e8; }
 .how-keys { margin: 14px 0 0; }
 @media (max-width: 680px) { .how-grid { grid-template-columns: 1fr; } }
+.combo { font-family: var(--display); font-size: 20px; font-weight: 700; color: var(--gold-hi); text-shadow: 0 0 12px rgba(255, 200, 90, 0.7), 0 2px 3px #000; letter-spacing: 0.5px; }
+.combo.warm { color: #ff9a3c; font-size: 23px; text-shadow: 0 0 16px rgba(255, 130, 40, 0.85), 0 2px 4px #000; }
+.combo.hot { color: #fff6d6; font-size: 26px; text-shadow: 0 0 22px rgba(255, 210, 90, 1), 0 0 8px #ff6a2a; }
 
 @media (prefers-reduced-motion: reduce) { .logo-main, .card.evo::after { animation: none; } }

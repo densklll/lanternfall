@@ -19,6 +19,7 @@
     this.input = { x: 0, y: 0 };
     this.enemies = []; this.shots = []; this.ebullets = []; this.gems = []; this.fx = []; this.texts = []; this.zones = []; this.beams = [];
     this.kills = 0; this.embersFound = 0; this.evolved = 0; this.shake = 0; this.flash = 0;
+    this.combo = 0; this.comboT = 0; this.maxCombo = 0;
     this.spawnT = 0; this.nextSwarm = 45; this.nextElite = 85; this.nextEndlessBoss = 180;
     this.boss = null; this.bossHpAtStart = 0; this.bossFightMinHp = 1; this.bossKilled = false;
     this.pendingLevels = 0; this.choices = null; this.endT = 0; this.slowmo = 1;
@@ -112,6 +113,14 @@
       this.addFx({ type: 'p', x: x, y: y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: life * (0.6 + this.rand() * 0.6), max: life, color: color, size: size || 3 });
     }
   };
+  P.sparkBurst = function (x, y, color, n, spd, life) {
+    if (this.noFx) return;
+    if (this.lowFx) n = Math.ceil(n / 2);
+    for (var i = 0; i < n; i++) {
+      var a = this.rand() * TAU, v = spd * (0.45 + this.rand() * 0.85);
+      this.addFx({ type: 'sp', x: x, y: y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: life * (0.6 + this.rand() * 0.5), max: life, color: color });
+    }
+  };
   P.text = function (x, y, s, color, big) {
     if (this.noFx) return;
     if (this.texts.length > 70) this.texts.shift();
@@ -176,9 +185,17 @@
     var key = src === 'moth' ? 'moths' : src === 'boom' ? 'spark' : (src || 'other');
     this.dmgBy[key] = (this.dmgBy[key] || 0) + Math.min(d, e.hp + d);
     if (knock && !e.boss) { var km = knock / (e.mass || 1); e.kx += kx * km; e.ky += ky * km; }
-    if (this.texts.length < 70 || crit) this.text(e.x, e.y - e.r, Math.round(d), crit ? '#ffd23f' : '#ffffff', crit);
+    if (this.texts.length < 70 || crit) this.text(e.x, e.y - e.r, crit ? (Math.round(d) + '!') : Math.round(d), crit ? '#ffe27a' : '#ffffff', crit);
+    if (!this.noFx) {
+      if (crit) {
+        this.shake = Math.min(7, this.shake + 1.4);
+        this.addFx({ type: 'ring', x: e.x, y: e.y, r: e.r * 1.4, max: 0.22, life: 0.22, color: '#ffe27a' });
+        this.sparkBurst(e.x, e.y, '#ffe27a', 6, 260, 0.28);
+      } else if (this.rand() < 0.45) {
+        this.sparkBurst(e.x, e.y, e.color, 3, 180, 0.22);
+      }
+    }
     if (e.hp <= 0) this.killEnemy(e);
-    else if (!this.noFx && this.rand() < 0.3) this.burst(e.x, e.y, e.color, 2, 90, 0.25, 2);
     return d;
   };
 
@@ -576,8 +593,15 @@
   P.killEnemy = function (e) {
     if (e.dead) return;
     e.dead = true; this.kills++;
+    this.combo++; this.comboT = 2.4;
+    if (this.combo > this.maxCombo) this.maxCombo = this.combo;
     var luck = this.stats.luck;
-    if (!this.noFx) { this.burst(e.x, e.y, e.color, e.boss ? 80 : (e.elite ? 30 : 7), e.boss ? 420 : 160, e.boss ? 1.2 : 0.45, e.boss ? 5 : 3); this.addFx({ type: 'ring', x: e.x, y: e.y, r: e.r, max: 0.3, life: 0.3, color: e.color }); }
+    if (!this.noFx) {
+      this.burst(e.x, e.y, e.color, e.boss ? 80 : (e.elite ? 32 : 8), e.boss ? 420 : 190, e.boss ? 1.2 : 0.45, e.boss ? 5 : 3);
+      this.sparkBurst(e.x, e.y, e.elite ? '#ffe27a' : e.color, e.boss ? 28 : (e.elite ? 16 : 5), e.boss ? 440 : 240, e.boss ? 0.7 : 0.32);
+      this.addFx({ type: 'ring', x: e.x, y: e.y, r: e.r * (e.elite ? 1.8 : 1.15), max: e.elite ? 0.45 : 0.28, life: e.elite ? 0.45 : 0.28, color: e.elite ? '#ffe27a' : e.color });
+      if (e.elite) { this.shake = Math.min(12, this.shake + 6); this.flashGold = Math.max(this.flashGold || 0, 0.25); }
+    }
     if (!this.noFx && !e.boss) this.addFx({ type: 'die', etype: e.type, x: e.x, y: e.y, r: e.r, flip: this.player.x < e.x, life: 0.42, max: 0.42 }); // death dissolve (visual only)
     if (e.boss) { this.onBossKilled(e); return; }
     if (e.elite && !this.noFx) this.hitStop = Math.max(this.hitStop, 0.055);
@@ -677,8 +701,9 @@
         if (!z.boomed) {
           z.boomed = true;
           this.query(z.x, z.y, z.r + 30, function (e) { if (!e.dead && dist2(z.x, z.y, e.x, e.y) < (z.r + e.r) * (z.r + e.r)) self.dealDamage(e, z.dmg, 0, 0, 0, 'meteor'); });
-          this.burst(z.x, z.y, z.color, 14, 260, 0.5, 3);
-          this.shake = Math.min(8, this.shake + 1.5);
+          this.burst(z.x, z.y, z.color, 18, 300, 0.55, 3.5);
+          this.sparkBurst(z.x, z.y, '#ffe27a', 12, 340, 0.4);
+          this.shake = Math.min(10, this.shake + 3.5);
           this.sfx('meteor');
         }
       } else if (z.type === 'shock') {
@@ -773,8 +798,13 @@
       this.computeStats();
     }
     this.shrines = (this.shrines || 0) + 1;
-    this.addFx({ type: 'ring', x: p.x, y: p.y, r: 60, max: 0.6, life: 0.6, color: '#fff1b8' });
-    this.burst(p.x, p.y, '#fff1b8', 24, 260, 0.6, 3);
+    this.flashGold = 0.45; this.shake = Math.min(12, this.shake + 6);
+    if (!this.noFx) {
+      this.addFx({ type: 'pillar', x: p.x, y: p.y, life: 0.65, max: 0.65, color: '#ffe9a8' });
+      this.addFx({ type: 'ring', x: p.x, y: p.y, r: 90, max: 0.55, life: 0.55, color: '#fff1b8' });
+      this.burst(p.x, p.y, '#fff1b8', 30, 300, 0.65, 3.5);
+      this.sparkBurst(p.x, p.y, '#ffe27a', 18, 360, 0.55);
+    }
     this.sfx('shrine');
     if (this.hooks.toast) this.hooks.toast('Алтарь: ' + b.name + '. ' + b.desc);
   };
@@ -806,6 +836,11 @@
     this.embersFound += bonusE;
     if (c) { this.applyChoice(c); txt = c.kind === 'evo' ? ('Эволюция: ' + c.title) : (c.title + (c.lv ? ' ур. ' + c.lv : '')); }
     else { this.player.hp = this.player.maxHp; txt = 'Полное здоровье'; }
+    this.flashGold = Math.max(this.flashGold || 0, 0.35); this.shake = Math.min(10, this.shake + 4);
+    if (!this.noFx) {
+      this.addFx({ type: 'ring', x: this.player.x, y: this.player.y, r: 80, max: 0.5, life: 0.5, color: '#ffd23f' });
+      this.sparkBurst(this.player.x, this.player.y, '#ffd23f', 16, 300, 0.5);
+    }
     this.sfx('chest');
     if (this.hooks.onChest) this.hooks.onChest(txt + ' и ' + bonusE + ' ◆');
   };
@@ -936,6 +971,7 @@
     // cleanup
     if (this.enemies.some(function (e) { return e.dead; })) this.enemies = this.enemies.filter(function (e) { return !e.dead; });
     this.updateFx(dt);
+    if (this.comboT > 0) { this.comboT -= dt; if (this.comboT <= 0) this.combo = 0; }
     this.shake = Math.max(0, this.shake - dt * 30); this.flash = Math.max(0, this.flash - dt); this.flashGold = Math.max(0, (this.flashGold || 0) - dt);
     if (this.pendingLevels > 0 && this.phase !== 'dead' && this.phase !== 'won') this.startLevelUp();
   };
@@ -945,7 +981,7 @@
     var f = this.fx;
     for (var i = f.length - 1; i >= 0; i--) {
       var o = f[i]; o.life -= dt;
-      if (o.type === 'p') { o.x += o.vx * dt; o.y += o.vy * dt; o.vx *= 0.92; o.vy *= 0.92; }
+      if (o.type === 'p' || o.type === 'sp') { o.x += o.vx * dt; o.y += o.vy * dt; o.vx *= 0.91; o.vy *= 0.91; }
       if (o.life <= 0) { f[i] = f[f.length - 1]; f.pop(); }
     }
     var tx = this.texts;

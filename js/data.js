@@ -2,7 +2,7 @@
 // Pure data, no DOM. Loaded both in the browser and in the node balance simulator.
 var LF = (typeof LF !== 'undefined') ? LF : {};
 
-LF.VERSION = '2.1.1';
+LF.VERSION = '2.2.0';
 
 // small seeded RNG (mulberry32): the daily challenge is the same for everyone on a given day
 LF.mulberry32 = function (a) {

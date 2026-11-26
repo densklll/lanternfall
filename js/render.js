@@ -22,13 +22,30 @@
   function drawGlow(ctx, color, x, y, r) {
     ctx.drawImage(glowSprite(color), x - r, y - r, r * 2, r * 2);
   }
+  // Soft volumetric feathered light cone (smooth horizontal & vertical falloff, zero hard edges!)
   function beamSprite(color) {
-    var k = 'bm' + color;
+    var k = 'bm2' + color;
     if (spriteCache[k]) return spriteCache[k];
-    var c = makeCanvas(38, 220), x = c.getContext('2d');
-    var g = x.createLinearGradient(0, 0, 0, 220);
-    g.addColorStop(0, hexA(color, 0)); g.addColorStop(0.6, hexA(color, 0.14)); g.addColorStop(1, hexA(color, 0.34));
-    x.fillStyle = g; x.fillRect(0, 0, 38, 220);
+    var W = 96, H = 260, c = makeCanvas(W, H), x = c.getContext('2d');
+    var base = hexA(color, 1).replace(/,1\)$/, ',');
+    // Layer 3 tapered cones from wide soft outer halo to bright narrow core
+    var layers = [[W * 0.48, 0.08], [W * 0.28, 0.14], [W * 0.12, 0.24]];
+    for (var i = 0; i < layers.length; i++) {
+      var hw = layers[i][0], al = layers[i][1];
+      var g = x.createLinearGradient(0, 0, 0, H);
+      g.addColorStop(0, base + '0)');
+      g.addColorStop(0.55, base + (al * 0.7).toFixed(3) + ')');
+      g.addColorStop(0.92, base + al.toFixed(3) + ')');
+      g.addColorStop(1, base + '0)');
+      x.fillStyle = g;
+      x.beginPath();
+      x.moveTo(W / 2 - hw * 0.45, 0);
+      x.lineTo(W / 2 + hw * 0.45, 0);
+      x.lineTo(W / 2 + hw, H);
+      x.lineTo(W / 2 - hw, H);
+      x.closePath();
+      x.fill();
+    }
     spriteCache[k] = c; return c;
   }
   var lightPuff = (function () {
@@ -221,8 +238,13 @@
       else if (gm.kind === 'shrine') {
         var sp = 1 + Math.sin(t * 3) * 0.08, fade = gm.age > 42 ? (Math.floor(t * 8) % 2 ? 0.4 : 1) : 1;
         ctx.globalAlpha = fade;
-        // Soft volumetric golden beacon shaft (cached sprite, zero per-frame gradient alloc!)
-        if (!view.lowQuality) ctx.drawImage(beamSprite('#ffe9a8'), gm.x - 19, gm.y - 210, 38, 220);
+        // Soft volumetric golden light cone (feathered, zero hard edges)
+        if (!view.lowQuality) {
+          ctx.save(); ctx.globalCompositeOperation = 'lighter';
+          ctx.globalAlpha = fade * (0.75 + 0.2 * Math.sin(t * 2.8));
+          ctx.drawImage(beamSprite('#ffe9a8'), gm.x - 48, gm.y - 246, 96, 260);
+          ctx.restore();
+        }
         // Rotating golden arcane rune circle on ground
         ctx.save(); ctx.translate(gm.x, gm.y + 8); ctx.scale(1, 0.55); ctx.rotate(t * 0.8);
         ctx.strokeStyle = 'rgba(255,232,150,0.6)'; ctx.lineWidth = 2;
@@ -259,7 +281,11 @@
         ctx.globalAlpha = 1;
       }
       else if (gm.kind === 'chest') {
-        if (!view.lowQuality) ctx.drawImage(beamSprite('#ffd23f'), gm.x - 14, gm.y - 148, 28, 156);
+        if (!view.lowQuality) {
+          ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.7;
+          ctx.drawImage(beamSprite('#ffd23f'), gm.x - 36, gm.y - 172, 72, 184);
+          ctx.restore();
+        }
         drawGlow(ctx, '#ffd23f', gm.x, gm.y + bob, 40); ctx.drawImage(chestSprite(), gm.x - 16, gm.y - 16 + bob, 32, 28);
       }
     }
@@ -420,6 +446,15 @@
     for (var fi = 0; fi < g.fx.length; fi++) {
       var fx = g.fx[fi], fa = Math.max(0, fx.life / fx.max);
       if (fx.type === 'p') { ctx.globalAlpha = fa; ctx.fillStyle = fx.color; ctx.fillRect(fx.x - fx.size / 2, fx.y - fx.size / 2, fx.size, fx.size); }
+      else if (fx.type === 'sp') {
+        ctx.globalAlpha = fa; ctx.strokeStyle = fx.color; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(fx.x, fx.y); ctx.lineTo(fx.x - fx.vx * 0.045, fx.y - fx.vy * 0.045); ctx.stroke();
+      }
+      else if (fx.type === 'pillar') {
+        ctx.globalAlpha = fa * 0.9;
+        var pw = 110 * (1.2 - fa * 0.5);
+        ctx.drawImage(beamSprite(fx.color), fx.x - pw / 2, fx.y - 340, pw, 360);
+      }
       else if (fx.type === 'hit') { var hs = hitSprite(fa > 0.66 ? 0 : fa > 0.33 ? 1 : 2), hz = fx.crit ? 26 : 16; ctx.globalAlpha = 1; ctx.drawImage(hs, fx.x - hz, fx.y - hz, hz * 2, hz * 2); }
       else if (fx.type === 'die') {
         if (ART && fx.etype) {
@@ -491,8 +526,9 @@
       ctx.textAlign = 'center';
       for (var ti = 0; ti < g.texts.length; ti++) {
         var tx = g.texts[ti]; ctx.globalAlpha = Math.min(1, tx.life * 2.5);
-        ctx.font = (tx.big ? '800 18px ' : '700 13px ') + '"Rubik", system-ui, sans-serif';
-        ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillText(tx.s, tx.x + 1, tx.y + 1); ctx.fillStyle = tx.color; ctx.fillText(tx.s, tx.x, tx.y);
+        var pop = tx.big && tx.life > 0.55 ? (1 + (tx.life - 0.55) * 2.2) : 1;
+        ctx.font = (tx.big ? ('800 ' + Math.round(19 * pop) + 'px ') : '700 13px ') + '"Rubik", system-ui, sans-serif';
+        ctx.fillStyle = 'rgba(0,0,0,0.72)'; ctx.fillText(tx.s, tx.x + 1.2, tx.y + 1.2); ctx.fillStyle = tx.color; ctx.fillText(tx.s, tx.x, tx.y);
       }
       ctx.globalAlpha = 1;
     }
@@ -515,11 +551,17 @@
       var ag = g.gems[ai]; if (ag.kind !== 'chest' && ag.kind !== 'shrine') continue;
       var gx = (ag.x - camX) * sc, gy = (ag.y - camY) * sc;
       if (gx >= 0 && gy >= 0 && gx <= W && gy <= H) continue;
-      var an = Math.atan2(gy - H / 2, gx - W / 2), mx2 = W / 2 - 26, my2 = H / 2 - 26;
+      var an = Math.atan2(gy - H / 2, gx - W / 2), mx2 = W / 2 - 34, my2 = H / 2 - 34;
       var kk2 = Math.min(Math.abs(mx2 / Math.cos(an)), Math.abs(my2 / Math.sin(an)));
-      ctx.save(); ctx.translate(W / 2 + Math.cos(an) * kk2, H / 2 + Math.sin(an) * kk2); ctx.rotate(an);
-      ctx.globalAlpha = 0.6 + 0.4 * Math.sin(t * 5); ctx.fillStyle = ag.kind === 'chest' ? '#ffd23f' : '#fff1b8';
-      ctx.beginPath(); ctx.moveTo(10, 0); ctx.lineTo(-6, -7); ctx.lineTo(-6, 7); ctx.fill(); ctx.restore(); ctx.globalAlpha = 1;
+      var px2 = W / 2 + Math.cos(an) * kk2, py2 = H / 2 + Math.sin(an) * kk2;
+      var colA = ag.kind === 'chest' ? '#ffd23f' : '#fff1b8';
+      var pulseA = 0.65 + 0.35 * Math.sin(t * 6);
+      ctx.save(); ctx.translate(px2, py2);
+      ctx.globalAlpha = pulseA * 0.35; ctx.fillStyle = colA; ctx.beginPath(); ctx.arc(0, 0, 16, 0, TAU); ctx.fill();
+      ctx.globalAlpha = pulseA;
+      ctx.rotate(an); ctx.fillStyle = colA; ctx.strokeStyle = '#140f1d'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(13, 0); ctx.lineTo(-7, -8); ctx.lineTo(-4, 0); ctx.lineTo(-7, 8); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.restore(); ctx.globalAlpha = 1;
     }
     if (g.flashGold > 0) { ctx.fillStyle = 'rgba(255,236,170,' + Math.min(0.35, g.flashGold) + ')'; ctx.fillRect(0, 0, W, H); }
     if (g.flash > 0) {

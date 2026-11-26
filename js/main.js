@@ -590,6 +590,16 @@
     }
     setText('kills', String(g.kills));
     setText('embersrun', String(g.embersEarned(false)));
+    var cm = g.combo >= 5 ? g.combo : 0;
+    if (lastHud.combo !== cm) {
+      lastHud.combo = cm;
+      var cel = $('combo');
+      cel.classList.toggle('hidden', !cm);
+      if (cm) {
+        cel.textContent = 'x' + cm;
+        cel.className = 'combo' + (cm >= 100 ? ' hot' : cm >= 30 ? ' warm' : '');
+      }
+    }
     if (g.boss) {
       setWidth('bossfill', g.boss.hp / g.boss.maxHp);
       var enr = !!(g.boss.half || g.boss.phase2 || g.boss.enraged);
